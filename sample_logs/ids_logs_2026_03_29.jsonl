@@ -1,0 +1,5 @@
+{"source_ip":"203.0.113.14","destination_ip":"192.168.1.12","attack_type":"Credential Stuffing","severity":"high","timestamp":"2026-03-29T02:05:22Z","raw_message":"Large volume login attempts with known leaked credentials"}
+{"source_ip":"172.67.22.18","destination_ip":"192.168.1.62","attack_type":"DDoS HTTP Flood","severity":"critical","timestamp":"2026-03-29T03:19:41Z","raw_message":"RPS spike above baseline from distributed IP blocks"}
+{"source_ip":"104.26.3.11","destination_ip":"192.168.1.77","attack_type":"Directory Traversal","severity":"high","timestamp":"2026-03-29T04:02:08Z","raw_message":"../ payload patterns in URI observed"}
+{"source_ip":"89.248.165.201","destination_ip":"192.168.1.80","attack_type":"Bot Recon","severity":"medium","timestamp":"2026-03-29T04:44:59Z","raw_message":"Automated user-agent with suspicious endpoint probing"}
+{"source_ip":"37.120.245.9","destination_ip":"192.168.1.91","attack_type":"Brute Force RDP","severity":"high","timestamp":"2026-03-29T05:08:13Z","raw_message":"RDP auth failures exceeded threshold"}

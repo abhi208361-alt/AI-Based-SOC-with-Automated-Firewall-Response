@@ -1,0 +1,12 @@
+{
+  "Brute Force SSH": {"tactic": "Credential Access", "technique": "T1110"},
+  "Brute Force RDP": {"tactic": "Credential Access", "technique": "T1110"},
+  "SQL Injection": {"tactic": "Initial Access", "technique": "T1190"},
+  "XSS Attempt": {"tactic": "Execution", "technique": "T1059"},
+  "RCE Probe": {"tactic": "Execution", "technique": "T1059"},
+  "Port Scan": {"tactic": "Reconnaissance", "technique": "T1595"},
+  "DDoS HTTP Flood": {"tactic": "Impact", "technique": "T1498"},
+  "Credential Stuffing": {"tactic": "Credential Access", "technique": "T1110.004"},
+  "DNS Amplification": {"tactic": "Impact", "technique": "T1498.001"},
+  "Bot Recon": {"tactic": "Reconnaissance", "technique": "T1595"}
+}

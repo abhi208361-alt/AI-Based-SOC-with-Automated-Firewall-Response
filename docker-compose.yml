@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: ai-soc-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: ai-soc-backend
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_DB=ai_soc_firewall
+      - SOC_JWT_SECRET=change-me
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:

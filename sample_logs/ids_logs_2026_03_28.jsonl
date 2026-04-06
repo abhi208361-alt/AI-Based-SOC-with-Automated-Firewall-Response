@@ -1,0 +1,5 @@
+{"source_ip":"185.220.101.1","destination_ip":"192.168.1.10","attack_type":"Brute Force SSH","severity":"high","timestamp":"2026-03-28T10:11:00Z","raw_message":"Multiple failed SSH logins from same source"}
+{"source_ip":"103.44.21.90","destination_ip":"192.168.1.20","attack_type":"SQL Injection","severity":"critical","timestamp":"2026-03-28T10:14:25Z","raw_message":"Suspicious UNION SELECT payload in query parameter"}
+{"source_ip":"45.9.148.11","destination_ip":"192.168.1.30","attack_type":"Port Scan","severity":"medium","timestamp":"2026-03-28T10:20:10Z","raw_message":"Sequential SYN packets detected on multiple ports"}
+{"source_ip":"91.219.236.77","destination_ip":"192.168.1.40","attack_type":"XSS Attempt","severity":"low","timestamp":"2026-03-28T10:35:42Z","raw_message":"Script tag payload detected in request body"}
+{"source_ip":"198.51.100.23","destination_ip":"192.168.1.50","attack_type":"RCE Probe","severity":"critical","timestamp":"2026-03-28T11:01:05Z","raw_message":"Attempt to execute shell command through vulnerable endpoint"}

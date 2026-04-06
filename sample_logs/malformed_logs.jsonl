@@ -1,0 +1,5 @@
+{"source_ip":"185.220.101.1","destination_ip":"192.168.1.10","attack_type":"Brute Force SSH","severity":"high","timestamp":"2026-03-28T10:11:00Z"}
+{"source_ip":"bad-ip","destination_ip":"192.168.1.20","attack_type":"SQL Injection","severity":"critical","timestamp":"2026-03-28T10:14:25Z"}
+{"source_ip":"45.9.148.11","destination_ip":"192.168.1.30","attack_type":"Port Scan","severity":"unknown","timestamp":"bad-date"}
+not-a-json-line
+{"source_ip":"91.219.236.77","destination_ip":"192.168.1.40","attack_type":"XSS Attempt","severity":"low","timestamp":"2026-03-28T10:35:42Z"}
