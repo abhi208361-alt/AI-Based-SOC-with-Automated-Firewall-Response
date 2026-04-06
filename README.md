@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI SOC Firewall (Capstone)
 
 ## Stack
@@ -35,3 +36,6 @@
 - `/api/v1/geo/lookup`
 - `/api/v1/siem/export`
 - `/ws/attacks`
+=======
+# AI-Based-SOC-with-Automated-Firewall-Response
+>>>>>>> a580a152b22fc4320f39c2d468bead83c6c098a8
