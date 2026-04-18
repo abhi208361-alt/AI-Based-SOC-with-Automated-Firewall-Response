@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 import ipaddress
 
-from core.security import require_role
+from deps import require_role
 from models.schemas import ThreatIntelResponse
 
 router = APIRouter(prefix="/threat-intel", tags=["Threat Intelligence"])

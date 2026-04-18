@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from core.security import require_role
+from deps import require_role
 from services.geo_service import GeoService
 
 router = APIRouter(prefix="/geo", tags=["Geo"])

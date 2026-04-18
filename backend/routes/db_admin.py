@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from core.security import require_role
+from deps import require_role
 from services.db_service import DBService
 
 router = APIRouter(prefix="/db", tags=["DB Admin"])

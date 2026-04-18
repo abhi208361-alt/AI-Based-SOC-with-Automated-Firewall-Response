@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from core.security import require_role
+from deps import require_role
 from models.schemas import ThreatHuntRequest, ThreatHuntResponse
 from services.db_service import DBService
 

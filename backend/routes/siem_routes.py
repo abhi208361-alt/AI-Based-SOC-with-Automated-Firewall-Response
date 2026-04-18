@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from datetime import datetime, timezone
-from core.security import require_role
+from deps import require_role
 from services.db_service import DBService
 
 router = APIRouter(prefix="/siem", tags=["SIEM"])

@@ -1,36 +1,38 @@
-from fastapi import APIRouter, HTTPException, Depends
-from models.schemas import LoginRequest, TokenResponse, UserProfile
-from services.db_service import DBService
-from core.security import verify_password, create_access_token, get_current_user
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+from db import get_db
+from models.entities import User
+from core.security import verify_password, create_access_token, create_refresh_token
+
+router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    role: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest):
-    user = DBService.get_user_by_email(payload.email)
-    if not user:
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not verify_password(payload.password, user.get("password_hash", "")):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    token = create_access_token(
-        data={"sub": user["id"], "email": user["email"], "role": user["role"]}
+    return TokenResponse(
+        access_token=create_access_token(user.id, user.role),
+        refresh_token=create_refresh_token(user.id, user.role),
+        role=user.role,
     )
-
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "role": user["role"]
-    }
-
-
-@router.get("/me", response_model=UserProfile)
-def me(current_user=Depends(get_current_user)):
-    return {
-        "id": current_user["id"],
-        "email": current_user["email"],
-        "full_name": current_user.get("full_name", ""),
-        "role": current_user["role"]
-    }

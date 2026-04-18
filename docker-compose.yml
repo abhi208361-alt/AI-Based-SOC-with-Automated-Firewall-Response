@@ -1,25 +1,94 @@
-version: "3.9"
-
 services:
-  mongo:
-    image: mongo:7
-    container_name: ai-soc-mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
-  backend:
-    build: ./backend
-    container_name: ai-soc-backend
+  db:
+    image: postgres:16
+    container_name: ai-basedsoc-db-1
     environment:
-      - MONGODB_URI=mongodb://mongo:27017
-      - MONGODB_DB=ai_soc_firewall
-      - SOC_JWT_SECRET=change-me
+      POSTGRES_USER: soc
+      POSTGRES_PASSWORD: soc
+      POSTGRES_DB: socdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soc -d socdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: ai-basedsoc-redis-1
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: ai-basedsoc-api-1
+    working_dir: /app
+    env_file:
+      - backend/.env
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: ai-basedsoc-worker-1
+    working_dir: /app
+    env_file:
+      - backend/.env
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./backend:/app
     depends_on:
-      - mongo
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    command: celery -A celery_app.celery worker --loglevel=info
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: ai-basedsoc-flower-1
+    working_dir: /app
+    env_file:
+      - backend/.env
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    ports:
+      - "5555:5555"
+    command: celery -A celery_app.celery flower --port=5555
 
 volumes:
-  mongo_data:
+  pgdata:
