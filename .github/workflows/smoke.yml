@@ -12,6 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,20 +32,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install MongoDB (service)
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mongodb
-          sudo systemctl start mongodb || sudo service mongodb start
-          sleep 3
-          mongosh --eval "db.adminCommand({ ping: 1 })" || mongo --eval "db.adminCommand('ping')"
-
       - name: Install dependencies
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          pip install -r ./backend/requirements.txt
+          if [ -f "./backend/requirements.txt" ]; then
+            pip install -r ./backend/requirements.txt
+          else
+            echo "backend/requirements.txt not found" >&2
+            exit 1
+          fi
           pip install joblib scikit-learn numpy pandas
 
       - name: Prepare ML artifacts
