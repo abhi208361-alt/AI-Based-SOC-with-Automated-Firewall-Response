@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
+
 import joblib
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 class AIModelPipeline:
@@ -43,14 +44,15 @@ class AIModelPipeline:
 
         X = pd.DataFrame([row], columns=feature_cols)
 
-        pred_id = self.rf.predict(X)[0]
-        attack_type = self.le_attack.inverse_transform([pred_id])[0]
+        pred_id = int(self.rf.predict(X)[0])
+        attack_type = str(self.le_attack.inverse_transform([pred_id])[0])
+
         probs = self.rf.predict_proba(X)[0]
         confidence = float(np.max(probs))
 
-        iso_pred = self.iso.predict(X)[0]
+        iso_pred = int(self.iso.predict(X)[0])
         iso_score = float(self.iso.decision_function(X)[0])
-        anomaly = iso_pred == -1
+        anomaly = bool(iso_pred == -1)
 
         anomaly_boost = 25 if anomaly else 0
         risk_score = min(100, int(confidence * 75) + anomaly_boost)
@@ -60,7 +62,7 @@ class AIModelPipeline:
             "confidence": round(confidence, 4),
             "anomaly_detected": anomaly,
             "anomaly_score": round(iso_score, 4),
-            "risk_score": risk_score
+            "risk_score": int(risk_score),
         }
 
 
