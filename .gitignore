@@ -1,6 +1,5 @@
-__pycache__/
+**/__pycache__/
 *.py[cod]
-*.pyo
-.venv/
 backend/reports_output/
+.venv/
 node_modules
