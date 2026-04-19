@@ -1,1 +1,6 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+backend/reports_output/
 node_modules
