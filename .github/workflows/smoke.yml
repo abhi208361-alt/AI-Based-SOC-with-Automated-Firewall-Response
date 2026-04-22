@@ -42,7 +42,7 @@ jobs:
             echo "backend/requirements.txt not found" >&2
             exit 1
           fi
-          pip install pymongo python-jose[cryptography] passlib[bcrypt] python-multipart httpx joblib scikit-learn numpy pandas
+          pip install pymongo python-jose[cryptography] passlib[bcrypt] python-multipart httpx joblib scikit-learn numpy pandas bcrypt
 
       - name: Prepare ML artifacts
         shell: bash
@@ -55,6 +55,42 @@ jobs:
             echo "rebuild_models_9f.py not found in repo root or backend/" >&2
             exit 1
           fi
+
+      - name: Seed smoke user in MongoDB
+        shell: bash
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017
+          MONGODB_DB: ai_soc_firewall
+        run: |
+          python - << 'PY'
+          import os
+          from pymongo import MongoClient
+          from passlib.context import CryptContext
+
+          uri = os.getenv("MONGODB_URI", "mongodb://127.0.0.1:27017")
+          db_name = os.getenv("MONGODB_DB", "ai_soc_firewall")
+
+          client = MongoClient(uri)
+          db = client[db_name]
+          users = db["users"]
+
+          pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+          plain = "admin123"
+          hashed = pwd_context.hash(plain)
+
+          doc = {
+            "username": "admin",
+            "email": "admin@example.com",
+            "role": "admin",
+            "is_active": True,
+            "password": hashed,
+            "hashed_password": hashed,
+            "password_plain": plain
+          }
+
+          users.update_one({"username": "admin"}, {"$set": doc}, upsert=True)
+          print("Seeded/updated admin user.")
+          PY
 
       - name: Start API (background)
         shell: bash
@@ -80,23 +116,7 @@ jobs:
           tail -n 200 api.log || true
           exit 1
 
-      - name: Seed smoke user
-        shell: pwsh
-        run: |
-          $body = @{
-            username = "admin"
-            password = "admin123"
-            role     = "admin"
-          } | ConvertTo-Json
-
-          try {
-            Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/auth/register" -ContentType "application/json" -Body $body | Out-Null
-            Write-Host "Smoke user created"
-          } catch {
-            Write-Host "Register may already exist; continuing..."
-          }
-
       - name: Run smoke E2E script
-        shell: pwsh
+        shell: bash
         run: |
-          pwsh -File ./scripts/smoke_e2e.ps1
+          pwsh -File ./scripts/smoke_e2e.ps1 || (echo "---- api.log ----" && tail -n 300 api.log && exit 1)
