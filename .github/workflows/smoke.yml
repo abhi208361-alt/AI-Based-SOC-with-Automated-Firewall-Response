@@ -80,6 +80,22 @@ jobs:
           tail -n 200 api.log || true
           exit 1
 
+      - name: Seed smoke user
+        shell: pwsh
+        run: |
+          $body = @{
+            username = "admin"
+            password = "admin123"
+            role     = "admin"
+          } | ConvertTo-Json
+
+          try {
+            Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/auth/register" -ContentType "application/json" -Body $body | Out-Null
+            Write-Host "Smoke user created"
+          } catch {
+            Write-Host "Register may already exist; continuing..."
+          }
+
       - name: Run smoke E2E script
         shell: pwsh
         run: |
