@@ -42,7 +42,7 @@ jobs:
             echo "backend/requirements.txt not found" >&2
             exit 1
           fi
-          pip install pymongo python-jose[cryptography] passlib[bcrypt] python-multipart httpx joblib scikit-learn numpy pandas bcrypt
+          pip install pymongo python-jose[cryptography] passlib[bcrypt] python-multipart httpx joblib scikit-learn numpy pandas
 
       - name: Prepare ML artifacts
         shell: bash
@@ -65,7 +65,6 @@ jobs:
           python - << 'PY'
           import os
           from pymongo import MongoClient
-          from passlib.context import CryptContext
 
           uri = os.getenv("MONGODB_URI", "mongodb://127.0.0.1:27017")
           db_name = os.getenv("MONGODB_DB", "ai_soc_firewall")
@@ -74,22 +73,20 @@ jobs:
           db = client[db_name]
           users = db["users"]
 
-          pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
           plain = "admin123"
-          hashed = pwd_context.hash(plain)
 
           doc = {
             "username": "admin",
             "email": "admin@example.com",
             "role": "admin",
             "is_active": True,
-            "password": hashed,
-            "hashed_password": hashed,
+            "password": plain,
+            "hashed_password": plain,
             "password_plain": plain
           }
 
           users.update_one({"username": "admin"}, {"$set": doc}, upsert=True)
-          print("Seeded/updated admin user.")
+          print("Seeded/updated admin user (plain fallback).")
           PY
 
       - name: Start API (background)
