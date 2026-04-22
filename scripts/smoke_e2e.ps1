@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "== API smoke E2E starting =="
 
 $base = "http://127.0.0.1:8000"
-$user = "admin"
+$email = "admin@example.com"
 $pass = "admin123"
 
 $openapi = Invoke-RestMethod -Method Get -Uri "$base/openapi.json"
@@ -24,68 +24,33 @@ if (-not $postCandidates -or $postCandidates.Count -eq 0) {
 
 Write-Host "Discovered auth POST candidates: $($postCandidates -join ', ')"
 
-function Try-LoginAgainstPath {
-  param(
-    [string]$Path,
-    $PostOp
-  )
-
-  $contentTypes = @()
-  if ($PostOp.requestBody -and $PostOp.requestBody.content) {
-    $contentTypes = @($PostOp.requestBody.content.PSObject.Properties.Name)
-  }
-
-  if (-not $contentTypes -or $contentTypes.Count -eq 0) {
-    # fallback tries
-    $contentTypes = @("application/json", "application/x-www-form-urlencoded")
-  }
-
-  Write-Host "Path $Path content-types: $($contentTypes -join ', ')"
-
-  foreach ($ct in $contentTypes) {
-    # Try common field variants
-    $bodies = @()
-
-    if ($ct -eq "application/json") {
-      $bodies += (@{ username=$user; password=$pass } | ConvertTo-Json -Depth 5)
-      $bodies += (@{ email=$user; password=$pass } | ConvertTo-Json -Depth 5)
-      $bodies += (@{ user=$user; password=$pass } | ConvertTo-Json -Depth 5)
-      $bodies += (@{ login=$user; password=$pass } | ConvertTo-Json -Depth 5)
-    } elseif ($ct -eq "application/x-www-form-urlencoded") {
-      $bodies += "username=$([uri]::EscapeDataString($user))&password=$([uri]::EscapeDataString($pass))"
-      $bodies += "email=$([uri]::EscapeDataString($user))&password=$([uri]::EscapeDataString($pass))"
-    } else {
-      continue
-    }
-
-    foreach ($body in $bodies) {
-      try {
-        Write-Host "Trying $Path with $ct and body: $body"
-        $resp = Invoke-RestMethod -Method Post -Uri "$base$Path" -ContentType $ct -Body $body
-        if ($resp) { return $resp }
-      } catch {
-        Write-Host "Failed ($Path, $ct): $($_.Exception.Message)"
-      }
-    }
-  }
-
-  return $null
-}
-
 $login = $null
 $usedPath = $null
 
+# Your endpoint expects JSON with email+password
+$bodyJson = @{
+  email    = $email
+  password = $pass
+} | ConvertTo-Json -Depth 5
+
 foreach ($p in $postCandidates) {
-  $postOp = $openapi.paths.$p.post
-  $login = Try-LoginAgainstPath -Path $p -PostOp $postOp
-  if ($login) {
-    $usedPath = $p
-    break
+  try {
+    Write-Host "Trying login endpoint: $p"
+    $login = Invoke-RestMethod -Method Post `
+      -Uri "$base$p" `
+      -ContentType "application/json" `
+      -Body $bodyJson
+    if ($login) {
+      $usedPath = $p
+      break
+    }
+  } catch {
+    Write-Host "Login failed at $p : $($_.Exception.Message)"
   }
 }
 
 if (-not $login) {
-  throw "Unable to login using discovered auth endpoints and payload variants."
+  throw "Unable to login using email/password on discovered auth endpoints."
 }
 
 $token = $login.access_token
