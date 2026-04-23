@@ -1,18 +1,9 @@
 import uuid
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from database.mongodb import connect_mongo, close_mongo  # IMPORTANT: not backend.database.mongodb
-
-
-@pytest.fixture(scope="session", autouse=True)
-def mongo_lifecycle():
-    connect_mongo()
-    yield
-    close_mongo()
 
 
 def test_login_success_seeded_admin():
@@ -20,6 +11,7 @@ def test_login_success_seeded_admin():
         payload = {"email": "admin@soc.local", "password": "Admin@123"}
         res = client.post("/api/v1/auth/login", json=payload)
         assert res.status_code == 200, res.text
+
         data = res.json()
         assert "access_token" in data
         assert data.get("token_type", "").lower() == "bearer"
@@ -49,6 +41,9 @@ def test_reports_generate_success_with_token():
         assert res.status_code == 200, res.text
 
         data = res.json()
-        assert "report_name" in data and "report_path" in data
+        assert "report_name" in data
+        assert "report_path" in data
         assert incident_id in data["report_name"]
-        assert Path(data["report_path"]).exists()
+
+        report_path = Path(data["report_path"])
+        assert report_path.exists(), f"Report file not found at {report_path}"
