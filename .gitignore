@@ -5,3 +5,7 @@ rebuild_ml_artifacts.py
 reset_admin.py
 backend/fix_login_user.py
 node_modules
+__pycache__/
+*.py[cod]
+backend/**/__pycache__/
+ml_models/
