@@ -14,5 +14,9 @@ class Settings(BaseModel):
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
+    abuseipdb_api_key: str = os.getenv("ABUSEIPDB_API_KEY", "")
+    abuseipdb_base_url: str = os.getenv("ABUSEIPDB_BASE_URL", "https://api.abuseipdb.com/api/v2/check")
+    threat_intel_cache_ttl_seconds: int = int(os.getenv("THREAT_INTEL_CACHE_TTL_SECONDS", "300"))
+
 
 settings = Settings()
