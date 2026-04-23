@@ -1,0 +1,13 @@
+{
+  "feature_cols": [
+    "source_port",
+    "dest_port",
+    "bytes_sent",
+    "bytes_received",
+    "failed_logins",
+    "request_rate",
+    "is_internal_src",
+    "proto",
+    "severity_num"
+  ]
+}

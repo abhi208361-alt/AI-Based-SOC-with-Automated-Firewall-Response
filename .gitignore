@@ -1,8 +1,7 @@
-# Python cache
-__pycache__/
-*.py[cod]
-
-# Project-specific generated artifacts
-backend/**/__pycache__/
-ml_models/
+backend/reports_output/
+github/
+create_dummy_models.py
+rebuild_ml_artifacts.py
+reset_admin.py
+backend/fix_login_user.py
 node_modules
