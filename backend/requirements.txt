@@ -1,4 +1,14 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-pydantic==2.9.2
+
+pydantic==2.7.4
+pydantic-core==2.18.4
+pydantic-settings==2.3.4
+
+SQLAlchemy==2.0.30
+alembic==1.13.2
+psycopg[binary]>=3.2.2,<3.4
+
+python-jose==3.3.0
+passlib==1.7.4
 reportlab==4.2.2
