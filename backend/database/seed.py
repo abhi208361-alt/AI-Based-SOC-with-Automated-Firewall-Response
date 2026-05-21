@@ -1,6 +1,6 @@
 import os
 
-from core.security import get_password_hash
+from core.security import hash_password
 from database.mongodb import db
 
 
@@ -9,7 +9,6 @@ def seed_admin_if_enabled() -> None:
     Seed a deterministic admin user for CI/tests.
 
     Enabled only when SEED_ADMIN_ON_STARTUP=1.
-    This avoids changing tests and makes /auth/login pass in GitHub Actions.
     """
     if os.getenv("SEED_ADMIN_ON_STARTUP", "0") != "1":
         return
@@ -19,11 +18,11 @@ def seed_admin_if_enabled() -> None:
 
     users = db()["users"]
 
+    password_hash = hash_password(admin_password)
+
     # Seed both fields to stay compatible with both auth implementations:
     # - routes/auth.py checks `password_hash`
     # - services/auth_service.py checks `hashed_password`
-    password_hash = get_password_hash(admin_password)
-
     users.update_one(
         {"email": admin_email},
         {
