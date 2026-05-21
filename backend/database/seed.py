@@ -1,38 +1,41 @@
-from datetime import datetime, timezone
-from database.mongodb import connect_mongo, close_mongo, db
-from core.security import hash_password
+import os
+
+from core.security import get_password_hash
+from database.mongodb import db
 
 
-def upsert_user(email: str, full_name: str, role: str, plain_password: str):
+def seed_admin_if_enabled() -> None:
+    """
+    Seed a deterministic admin user for CI/tests.
+
+    Enabled only when SEED_ADMIN_ON_STARTUP=1.
+    This avoids changing tests and makes /auth/login pass in GitHub Actions.
+    """
+    if os.getenv("SEED_ADMIN_ON_STARTUP", "0") != "1":
+        return
+
+    admin_email = os.getenv("SEED_ADMIN_EMAIL", "admin@soc.local").lower()
+    admin_password = os.getenv("SEED_ADMIN_PASSWORD", "Admin@123")
+
     users = db()["users"]
+
+    # Seed both fields to stay compatible with both auth implementations:
+    # - routes/auth.py checks `password_hash`
+    # - services/auth_service.py checks `hashed_password`
+    password_hash = get_password_hash(admin_password)
+
     users.update_one(
-        {"email": email},
+        {"email": admin_email},
         {
-            "$set": {
-                "email": email,
-                "full_name": full_name,
-                "role": role,
-                "password_hash": hash_password(plain_password),  # plain password only
-                "updated_at": datetime.now(timezone.utc),
-            },
             "$setOnInsert": {
-                "created_at": datetime.now(timezone.utc),
-            },
+                "id": "seeded-admin",
+                "email": admin_email,
+                "role": "admin",
+                "disabled": False,
+                "full_name": "Seeded Admin",
+                "password_hash": password_hash,
+                "hashed_password": password_hash,
+            }
         },
         upsert=True,
     )
-
-
-def main():
-    connect_mongo()
-
-    # IMPORTANT: plain text here, not hash
-    upsert_user("admin@soc.local", "SOC Admin", "admin", "Admin@123")
-    upsert_user("analyst@soc.local", "SOC Analyst", "analyst", "Analyst@123")
-
-    print("Seed complete")
-    close_mongo()
-
-
-if __name__ == "__main__":
-    main()

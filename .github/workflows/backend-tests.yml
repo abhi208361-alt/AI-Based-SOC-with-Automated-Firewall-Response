@@ -52,5 +52,6 @@ jobs:
           PYTHONPATH: backend
           MONGO_URI: mongodb://localhost:27017
           MONGODB_URI: mongodb://localhost:27017
+          SEED_ADMIN_ON_STARTUP: "1"
         run: |
           python -m pytest -q
