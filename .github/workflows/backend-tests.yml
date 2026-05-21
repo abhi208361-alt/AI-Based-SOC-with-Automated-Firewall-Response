@@ -10,6 +10,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,13 +31,27 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
+
+          if [ ! -f backend/requirements.txt ]; then
+            echo "backend/requirements.txt not found" >&2
+            exit 1
+          fi
+
+          pip install -r backend/requirements.txt
           pip install pytest
+
+          # Sanity check: fail fast if required imports aren't available
+          python -c "import httpx; import pymongo; print('httpx ok', httpx.__version__); print('pymongo ok', pymongo.__version__)"
 
       - name: Run tests
         env:
           PYTHONPATH: backend
+          MONGO_URI: mongodb://localhost:27017
+          MONGODB_URI: mongodb://localhost:27017
+          SEED_ADMIN_ON_STARTUP: "1"
         run: |
           python -m pytest -q
