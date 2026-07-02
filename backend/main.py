@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-import inspect
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -8,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
 from backend.database.mongodb import close_mongo, connect_mongo
 from backend.database.seed import seed_admin_if_enabled
-from backend.middleware.error_handler import generic_exception_handler, validation_exception_handler
+from backend.middleware.error_handler import (
+    generic_exception_handler,
+    validation_exception_handler,
+)
 from backend.routes.attacks import router as attacks_router
 from backend.routes.auth import router as auth_router
 from backend.routes.db_admin import router as db_admin_router
@@ -26,21 +28,19 @@ from backend.routes.ws_routes import router as ws_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup: connect DB first, then seed
-    maybe_connect = connect_mongo()
-    if inspect.isawaitable(maybe_connect):
-        await maybe_connect
-
+    # Startup: connect DB first, then seed admin if enabled
+    connect_mongo()
     seed_admin_if_enabled()
     yield
-
-    # shutdown
-    maybe_close = close_mongo()
-    if inspect.isawaitable(maybe_close):
-        await maybe_close
+    # Shutdown
+    close_mongo()
 
 
-app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
