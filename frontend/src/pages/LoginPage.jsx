@@ -6,12 +6,13 @@ export default function LoginPage({ onLogin }) {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("admin@soc.local");
-  const [password, setPassword] = useState("123456");
+  const [password, setPassword] = useState("Admin@123");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submit
     setError("");
     setLoading(true);
 
@@ -63,6 +64,7 @@ export default function LoginPage({ onLogin }) {
             <input
               type="email"
               required
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none focus:border-cyan-500"
@@ -75,6 +77,7 @@ export default function LoginPage({ onLogin }) {
             <input
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none focus:border-cyan-500"
