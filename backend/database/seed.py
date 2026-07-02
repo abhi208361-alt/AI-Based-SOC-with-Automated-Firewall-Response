@@ -5,6 +5,10 @@ from backend.database.mongodb import db
 
 
 def seed_admin_if_enabled() -> None:
+    """
+    Seed deterministic admin for CI/tests when enabled.
+    Safe if Mongo isn't connected yet.
+    """
     if os.getenv("SEED_ADMIN_ON_STARTUP", "0") != "1":
         return
 
@@ -14,6 +18,7 @@ def seed_admin_if_enabled() -> None:
     try:
         users = db()["users"]
     except RuntimeError:
+        # Mongo not connected in this environment/startup phase
         return
 
     password_hash = hash_password(admin_password)
