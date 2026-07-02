@@ -23,9 +23,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // clear stale auth
       localStorage.removeItem("soc_token");
       localStorage.removeItem("access_token");
-      window.location.href = "/login";
+      localStorage.removeItem("user");
+      localStorage.removeItem("role");
+
+      // IMPORTANT: avoid redirect loop on /login
+      if (window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
     }
     return Promise.reject(error);
   }
