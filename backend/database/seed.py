@@ -1,7 +1,7 @@
 import os
 
-from core.security import hash_password
-from database.mongodb import db
+from backend.core.security import hash_password
+from backend.database.mongodb import db
 
 
 def seed_admin_if_enabled() -> None:
@@ -9,6 +9,7 @@ def seed_admin_if_enabled() -> None:
     Seed a deterministic admin user for CI/tests.
 
     Enabled only when SEED_ADMIN_ON_STARTUP=1.
+    Safe to call during startup even if DB connection is not ready.
     """
     if os.getenv("SEED_ADMIN_ON_STARTUP", "0") != "1":
         return
@@ -16,7 +17,12 @@ def seed_admin_if_enabled() -> None:
     admin_email = os.getenv("SEED_ADMIN_EMAIL", "admin@soc.local").lower()
     admin_password = os.getenv("SEED_ADMIN_PASSWORD", "Admin@123")
 
-    users = db()["users"]
+    try:
+        users = db()["users"]
+    except RuntimeError:
+        # In tests/CI startup races, DB might not be connected yet.
+        # Lifespan should connect first, but this guard prevents hard crash.
+        return
 
     password_hash = hash_password(admin_password)
 
