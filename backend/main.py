@@ -5,26 +5,26 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.core.config import settings
-from backend.database.mongodb import close_mongo, connect_mongo
-from backend.database.seed import seed_admin_if_enabled
-from backend.middleware.error_handler import (
+from core.config import settings
+from database.mongodb import close_mongo, connect_mongo
+from database.seed import seed_admin_if_enabled
+from middleware.error_handler import (
     generic_exception_handler,
     validation_exception_handler,
 )
-from backend.routes.attacks import router as attacks_router
-from backend.routes.auth import router as auth_router
-from backend.routes.db_admin import router as db_admin_router
-from backend.routes.firewall_routes import router as firewall_router
-from backend.routes.geo_routes import router as geo_router
-from backend.routes.health import router as health_router
-from backend.routes.hunting import router as hunting_router
-from backend.routes.ingestion import router as ingestion_router
-from backend.routes.ml_routes import router as ml_router
-from backend.routes.reports import router as reports_router
-from backend.routes.siem_routes import router as siem_router
-from backend.routes.threat_intel import router as threat_intel_router
-from backend.routes.ws_routes import router as ws_router
+from routes.attacks import router as attacks_router
+from routes.auth import router as auth_router
+from routes.db_admin import router as db_admin_router
+from routes.firewall_routes import router as firewall_router
+from routes.geo_routes import router as geo_router
+from routes.health import router as health_router
+from routes.hunting import router as hunting_router
+from routes.ingestion import router as ingestion_router
+from routes.ml_routes import router as ml_router
+from routes.reports import router as reports_router
+from routes.siem_routes import router as siem_router
+from routes.threat_intel import router as threat_intel_router
+from routes.ws_routes import router as ws_router
 
 
 @asynccontextmanager
