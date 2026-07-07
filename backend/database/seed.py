@@ -1,7 +1,7 @@
 import os
 
-from core.security import hash_password
-from services.db_service import DBService
+from backend.core.security import hash_password
+from backend.database.mongodb import db
 
 
 def seed_admin_if_enabled() -> None:
@@ -9,24 +9,29 @@ def seed_admin_if_enabled() -> None:
     Seed a deterministic admin user for CI/tests.
 
     Enabled only when SEED_ADMIN_ON_STARTUP=1.
-    Works with Mongo when available and falls back to in-memory DBService store
-    when Mongo is unavailable in CI.
     """
     if os.getenv("SEED_ADMIN_ON_STARTUP", "0") != "1":
         return
 
     admin_email = os.getenv("SEED_ADMIN_EMAIL", "admin@soc.local").lower()
     admin_password = os.getenv("SEED_ADMIN_PASSWORD", "Admin@123")
+
+    users = db()["users"]
     password_hash = hash_password(admin_password)
 
-    DBService.upsert_seed_user(
+    # Keep both fields for compatibility with different auth paths.
+    users.update_one(
+        {"email": admin_email},
         {
-            "id": "seeded-admin",
-            "email": admin_email,
-            "role": "admin",
-            "disabled": False,
-            "full_name": "Seeded Admin",
-            "password_hash": password_hash,
-            "hashed_password": password_hash,
-        }
+            "$setOnInsert": {
+                "id": "seeded-admin",
+                "email": admin_email,
+                "role": "admin",
+                "disabled": False,
+                "full_name": "Seeded Admin",
+                "password_hash": password_hash,
+                "hashed_password": password_hash,
+            }
+        },
+        upsert=True,
     )
