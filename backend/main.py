@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import inspect
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -28,12 +29,20 @@ from backend.routes.ws_routes import router as ws_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: connect DB first, then seed admin if enabled
-    connect_mongo()
+    # Startup: connect Mongo first (supports sync or async connect_mongo)
+    maybe_connect = connect_mongo()
+    if inspect.isawaitable(maybe_connect):
+        await maybe_connect
+
+    # Seed admin only after DB connect attempt
     seed_admin_if_enabled()
+
     yield
-    # Shutdown
-    close_mongo()
+
+    # Shutdown: supports sync or async close_mongo
+    maybe_close = close_mongo()
+    if inspect.isawaitable(maybe_close):
+        await maybe_close
 
 
 app = FastAPI(
