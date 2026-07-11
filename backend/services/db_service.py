@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from bson import ObjectId
 
-from backend.database.mongodb import db
+from database.mongodb import db
 
 
 # In-memory fallback (used only when Mongo is unavailable in CI/tests)
