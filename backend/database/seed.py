@@ -1,7 +1,7 @@
 import os
 
-from backend.core.security import hash_password
-from backend.database.mongodb import db
+from core.security import hash_password
+from database.mongodb import db
 
 
 def seed_admin_if_enabled() -> None:
@@ -19,7 +19,6 @@ def seed_admin_if_enabled() -> None:
     users = db()["users"]
     password_hash = hash_password(admin_password)
 
-    # Keep both fields for compatibility with different auth paths.
     users.update_one(
         {"email": admin_email},
         {
