@@ -3,8 +3,28 @@ let reconnectTimer = null;
 let closedManually = false;
 let retries = 0;
 
+function getWsBaseUrl() {
+  // 1) explicit env override (recommended if set)
+  const fromEnv = import.meta.env.VITE_WS_BASE_URL;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+
+  // 2) derive from VITE_API_URL (e.g. https://host/api/v1 -> wss://host)
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) {
+    return apiUrl
+      .replace(/\/api\/v1\/?$/, "")
+      .replace(/^https:\/\//, "wss://")
+      .replace(/^http:\/\//, "ws://")
+      .replace(/\/$/, "");
+  }
+
+  // 3) safe fallback: derive from current browser origin
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${window.location.host}`;
+}
+
 export function connectAttackSocket({ onMessage, onOpen, onClose }) {
-  const WS_BASE = import.meta.env.VITE_WS_BASE_URL || "ws://127.0.0.1:8000";
+  const WS_BASE = getWsBaseUrl();
   const url = `${WS_BASE}/ws/attacks`;
 
   const clearTimer = () => {
@@ -16,6 +36,7 @@ export function connectAttackSocket({ onMessage, onOpen, onClose }) {
 
   const connect = () => {
     clearTimer();
+
     try {
       ws = new WebSocket(url);
     } catch {
@@ -51,7 +72,7 @@ export function connectAttackSocket({ onMessage, onOpen, onClose }) {
 
     ws.onerror = () => {
       try {
-        ws.close();
+        ws?.close();
       } catch {}
     };
   };

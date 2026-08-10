@@ -17,12 +17,8 @@ def seed_admin_if_enabled() -> None:
     admin_password = os.getenv("SEED_ADMIN_PASSWORD", "Admin@123")
 
     users = db()["users"]
-
     password_hash = hash_password(admin_password)
 
-    # Seed both fields to stay compatible with both auth implementations:
-    # - routes/auth.py checks `password_hash`
-    # - services/auth_service.py checks `hashed_password`
     users.update_one(
         {"email": admin_email},
         {

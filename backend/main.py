@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import inspect
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -7,7 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from database.mongodb import close_mongo, connect_mongo
 from database.seed import seed_admin_if_enabled
-from middleware.error_handler import generic_exception_handler, validation_exception_handler
+from middleware.error_handler import (
+    generic_exception_handler,
+    validation_exception_handler,
+)
 from routes.attacks import router as attacks_router
 from routes.auth import router as auth_router
 from routes.db_admin import router as db_admin_router
@@ -25,13 +29,27 @@ from routes.ws_routes import router as ws_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    connect_mongo()
+    # Startup: connect Mongo first (supports sync or async connect_mongo)
+    maybe_connect = connect_mongo()
+    if inspect.isawaitable(maybe_connect):
+        await maybe_connect
+
+    # Seed admin only after DB connect attempt
     seed_admin_if_enabled()
+
     yield
-    close_mongo()
+
+    # Shutdown: supports sync or async close_mongo
+    maybe_close = close_mongo()
+    if inspect.isawaitable(maybe_close):
+        await maybe_close
 
 
-app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,9 +74,6 @@ app.include_router(ingestion_router, prefix=settings.api_prefix)
 app.include_router(ml_router, prefix=settings.api_prefix)
 app.include_router(geo_router, prefix=settings.api_prefix)
 app.include_router(siem_router, prefix=settings.api_prefix)
-
-# NOTE: You had some duplicate include_router() lines before; I removed the duplicates above.
-# If you intentionally wanted them duplicated (usually not), you can add them back.
 
 # WebSocket route should not use /api/v1 prefix
 app.include_router(ws_router)
