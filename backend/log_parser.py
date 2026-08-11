@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+
 from models.schemas import AttackLogIn
 
 SUPPORTED_SEVERITIES = {"low", "medium", "high", "critical"}

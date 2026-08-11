@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
+
+from models.schemas import FirewallActionRequest
 from services.db_service import DBService
 from services.firewall_service import FirewallService
-from models.schemas import FirewallActionRequest
 
 AUTO_BLOCK_THRESHOLD = 85
 AUTO_INCIDENT_THRESHOLD = 70
@@ -33,7 +34,9 @@ class PlaybookService:
 
         # 2) Auto-block for critical risk
         if risk >= AUTO_BLOCK_THRESHOLD and src_ip:
-            req = FirewallActionRequest(ip_address=src_ip, reason=f"Auto-block by playbook (risk={risk})")
+            req = FirewallActionRequest(
+                ip_address=src_ip, reason=f"Auto-block by playbook (risk={risk})"
+            )
             fw = FirewallService.block_ip(req)
             actions.append("ip_blocked" if fw.get("success") else "ip_block_failed")
 

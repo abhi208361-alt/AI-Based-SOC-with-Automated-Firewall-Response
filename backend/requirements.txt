@@ -12,6 +12,7 @@ psycopg[binary]>=3.2.2,<3.4
 python-jose==3.3.0
 passlib==1.7.4
 reportlab==4.2.2
+types-reportlab==4.0.0.20240316
 httpx==0.27.0
 pymongo==4.7.3
 prometheus-client==0.20.0

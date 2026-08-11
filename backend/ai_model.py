@@ -21,7 +21,9 @@ class AIModelPipeline:
         self.iso = joblib.load(self.base_dir / "isolation_forest.pkl")
         self.le_attack = joblib.load(self.base_dir / "label_encoder_attack.pkl")
         self.le_proto = joblib.load(self.base_dir / "label_encoder_proto.pkl")
-        self.meta = json.loads((self.base_dir / "model_metadata.json").read_text(encoding="utf-8"))
+        self.meta = json.loads(
+            (self.base_dir / "model_metadata.json").read_text(encoding="utf-8")
+        )
 
     def predict(self, sample: dict) -> dict:
         feature_cols = self.meta["feature_cols"]

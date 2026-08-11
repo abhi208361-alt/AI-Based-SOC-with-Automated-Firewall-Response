@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from core.security import create_access_token, get_current_user, verify_password
+from fastapi import APIRouter, Depends, HTTPException
 from models.schemas import LoginRequest, TokenResponse, UserProfile
 from services.db_service import DBService
-from core.security import verify_password, create_access_token, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -19,11 +19,7 @@ def login(payload: LoginRequest):
         data={"sub": user["id"], "email": user["email"], "role": user["role"]}
     )
 
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "role": user["role"]
-    }
+    return {"access_token": token, "token_type": "bearer", "role": user["role"]}
 
 
 @router.get("/me", response_model=UserProfile)
@@ -32,5 +28,5 @@ def me(current_user=Depends(get_current_user)):
         "id": current_user["id"],
         "email": current_user["email"],
         "full_name": current_user.get("full_name", ""),
-        "role": current_user["role"]
+        "role": current_user["role"],
     }

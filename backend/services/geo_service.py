@@ -10,7 +10,14 @@ class GeoService:
                 r = await client.get(url)
                 data = r.json()
                 if data.get("status") != "success":
-                    return {"ip": ip, "country": None, "city": None, "lat": None, "lon": None, "isp": None}
+                    return {
+                        "ip": ip,
+                        "country": None,
+                        "city": None,
+                        "lat": None,
+                        "lon": None,
+                        "isp": None,
+                    }
                 return {
                     "ip": data.get("query"),
                     "country": data.get("country"),
@@ -19,7 +26,14 @@ class GeoService:
                     "lat": data.get("lat"),
                     "lon": data.get("lon"),
                     "isp": data.get("isp"),
-                    "org": data.get("org")
+                    "org": data.get("org"),
                 }
         except Exception:
-            return {"ip": ip, "country": None, "city": None, "lat": None, "lon": None, "isp": None}
+            return {
+                "ip": ip,
+                "country": None,
+                "city": None,
+                "lat": None,
+                "lon": None,
+                "isp": None,
+            }

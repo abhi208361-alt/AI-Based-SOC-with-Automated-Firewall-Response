@@ -1,12 +1,11 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from bson import ObjectId
+from typing import Any
 
+from bson import ObjectId
 from database.mongodb import db
 
-
 # In-memory fallback (used only when Mongo is unavailable in CI/tests)
-_FAKE_USERS: Dict[str, Dict[str, Any]] = {}
+_FAKE_USERS: dict[str, dict[str, Any]] = {}
 
 
 class DBService:
@@ -27,7 +26,7 @@ class DBService:
         return db()["incidents"]
 
     @staticmethod
-    def _normalize_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_doc(doc: dict[str, Any]) -> dict[str, Any]:
         if not doc:
             return doc
         out = dict(doc)
@@ -40,11 +39,11 @@ class DBService:
         return out
 
     @staticmethod
-    def _normalize_many(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _normalize_many(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [DBService._normalize_doc(d) for d in docs]
 
     @staticmethod
-    def create_user(user_doc: Dict[str, Any]) -> Dict[str, Any]:
+    def create_user(user_doc: dict[str, Any]) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
         user_doc.setdefault("created_at", now)
         user_doc.setdefault("updated_at", now)
@@ -65,7 +64,7 @@ class DBService:
             return DBService._normalize_doc(_FAKE_USERS[email])
 
     @staticmethod
-    def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    def get_user_by_email(email: str) -> dict[str, Any] | None:
         email = (email or "").lower()
         try:
             doc = DBService.get_user_collection().find_one({"email": email})
@@ -75,7 +74,7 @@ class DBService:
             return DBService._normalize_doc(doc) if doc else None
 
     @staticmethod
-    def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+    def get_user_by_id(user_id: str) -> dict[str, Any] | None:
         try:
             col = DBService.get_user_collection()
             try:
@@ -90,7 +89,7 @@ class DBService:
             return None
 
     @staticmethod
-    def upsert_seed_user(user_doc: Dict[str, Any]) -> None:
+    def upsert_seed_user(user_doc: dict[str, Any]) -> None:
         email = (user_doc.get("email") or "").lower()
         if not email:
             return
@@ -108,7 +107,7 @@ class DBService:
             _FAKE_USERS.setdefault(email, user_doc)
 
     @staticmethod
-    def insert_attack(item: Dict[str, Any]) -> Dict[str, Any]:
+    def insert_attack(item: dict[str, Any]) -> dict[str, Any]:
         col = DBService.get_attack_collection()
         now = datetime.now(timezone.utc)
         item.setdefault("timestamp", now)
@@ -119,17 +118,24 @@ class DBService:
         return DBService._normalize_doc(saved)
 
     @staticmethod
-    def list_attacks(limit: int = 500) -> List[Dict[str, Any]]:
-        docs = list(DBService.get_attack_collection().find({}).sort("timestamp", -1).limit(limit))
+    def list_attacks(limit: int = 500) -> list[dict[str, Any]]:
+        docs = list(
+            DBService.get_attack_collection()
+            .find({})
+            .sort("timestamp", -1)
+            .limit(limit)
+        )
         return DBService._normalize_many(docs)
 
     @staticmethod
-    def search_attacks(filters: Dict[str, Any]) -> List[Dict[str, Any]]:
-        docs = list(DBService.get_attack_collection().find(filters).sort("timestamp", -1))
+    def search_attacks(filters: dict[str, Any]) -> list[dict[str, Any]]:
+        docs = list(
+            DBService.get_attack_collection().find(filters).sort("timestamp", -1)
+        )
         return DBService._normalize_many(docs)
 
     @staticmethod
-    def insert_firewall_rule(rule: Dict[str, Any]) -> Dict[str, Any]:
+    def insert_firewall_rule(rule: dict[str, Any]) -> dict[str, Any]:
         col = DBService.get_firewall_collection()
         now = datetime.now(timezone.utc)
         rule.setdefault("created_at", now)
@@ -139,12 +145,17 @@ class DBService:
         return DBService._normalize_doc(saved)
 
     @staticmethod
-    def list_firewall_rules(limit: int = 500) -> List[Dict[str, Any]]:
-        docs = list(DBService.get_firewall_collection().find({}).sort("created_at", -1).limit(limit))
+    def list_firewall_rules(limit: int = 500) -> list[dict[str, Any]]:
+        docs = list(
+            DBService.get_firewall_collection()
+            .find({})
+            .sort("created_at", -1)
+            .limit(limit)
+        )
         return DBService._normalize_many(docs)
 
     @staticmethod
-    def insert_incident(incident: Dict[str, Any]) -> Dict[str, Any]:
+    def insert_incident(incident: dict[str, Any]) -> dict[str, Any]:
         col = DBService.get_incident_collection()
         now = datetime.now(timezone.utc)
         incident.setdefault("created_at", now)

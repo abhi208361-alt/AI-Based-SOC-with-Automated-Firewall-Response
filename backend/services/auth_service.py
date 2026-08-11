@@ -1,6 +1,6 @@
-from fastapi import HTTPException
-from core.security import verify_password, create_access_token
+from core.security import create_access_token, verify_password
 from database.mongodb import get_db
+from fastapi import HTTPException
 
 
 class AuthService:
@@ -19,7 +19,9 @@ class AuthService:
     @staticmethod
     def get_profile(email: str) -> dict:
         db = get_db()
-        user = db["users"].find_one({"email": email.lower()}, {"_id": 0, "hashed_password": 0})
+        user = db["users"].find_one(
+            {"email": email.lower()}, {"_id": 0, "hashed_password": 0}
+        )
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user

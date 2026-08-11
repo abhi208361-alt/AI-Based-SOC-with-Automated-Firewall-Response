@@ -1,4 +1,5 @@
 import time
+
 import httpx
 from core.config import settings
 
@@ -48,7 +49,9 @@ class ThreatIntelService:
         headers = {"Key": settings.abuseipdb_api_key, "Accept": "application/json"}
         params = {"ipAddress": ip, "maxAgeInDays": 90, "verbose": True}
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(settings.abuseipdb_base_url, headers=headers, params=params)
+            resp = await client.get(
+                settings.abuseipdb_base_url, headers=headers, params=params
+            )
             resp.raise_for_status()
             data = resp.json().get("data", {})
             score = int(data.get("abuseConfidenceScore", 0))

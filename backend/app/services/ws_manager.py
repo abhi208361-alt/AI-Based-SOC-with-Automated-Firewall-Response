@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Set
 from fastapi import WebSocket
 
 
 class WSConnectionManager:
     def __init__(self) -> None:
-        self.connections: Set[WebSocket] = set()
+        self.connections: set[WebSocket] = set()
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()

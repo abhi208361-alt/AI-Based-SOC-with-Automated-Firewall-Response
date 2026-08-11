@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
-from passlib.context import CryptContext
 
 from core.config import settings
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from services.db_service import DBService
 
 # Use pbkdf2_sha256 to avoid bcrypt backend/version issues on Windows
@@ -36,7 +36,9 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+):
     token = credentials.credentials
     payload = decode_access_token(token)
     user_id = payload.get("sub")
@@ -53,4 +55,5 @@ def require_role(roles: list[str]):
         if user.get("role") not in roles:
             raise HTTPException(status_code=403, detail="Forbidden")
         return user
+
     return _checker

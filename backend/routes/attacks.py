@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends
 from core.security import require_role
+from fastapi import APIRouter, Depends
 from models.schemas import AttackLogIn
 from services.attack_service import AttackService
 

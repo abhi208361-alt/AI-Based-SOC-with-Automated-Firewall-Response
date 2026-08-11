@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
     REDIS_URL: str = ""
 
-    CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     RATE_LIMIT_DEFAULT: str = "120/minute"
     RATE_LIMIT_LOGIN: str = "5/minute"
@@ -61,7 +61,9 @@ class Settings(BaseSettings):
             if not self.REDIS_URL:
                 missing.append("REDIS_URL")
             if missing:
-                raise RuntimeError(f"Missing required production settings: {', '.join(missing)}")
+                raise RuntimeError(
+                    f"Missing required production settings: {', '.join(missing)}"
+                )
 
 
 @lru_cache

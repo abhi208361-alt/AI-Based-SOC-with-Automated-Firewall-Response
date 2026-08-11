@@ -1,4 +1,5 @@
 import os
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
@@ -18,7 +19,9 @@ class ReportService:
         c.setFont("Helvetica", 11)
         c.drawString(50, 770, f"Incident ID: {incident_id}")
         c.drawString(50, 750, "Generated in Step 1 backend test mode.")
-        c.drawString(50, 730, "Detailed fields will be populated in later integration steps.")
+        c.drawString(
+            50, 730, "Detailed fields will be populated in later integration steps."
+        )
         c.save()
 
         return {"success": True, "report_name": file_name, "report_path": file_path}

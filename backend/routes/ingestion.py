@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Body
 from core.security import require_role
+from fastapi import APIRouter, Body, Depends
 from services.log_ingestion_service import LogIngestionService
 
 router = APIRouter(prefix="/ingestion", tags=["Log Ingestion"])

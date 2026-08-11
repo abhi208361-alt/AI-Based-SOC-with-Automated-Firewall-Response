@@ -1,6 +1,6 @@
 from datetime import datetime
 from ipaddress import IPv4Address
-from typing import Optional, Literal, List, Dict, Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,7 @@ class AttackLogIn(BaseModel):
     attack_type: str = Field(..., min_length=2, max_length=100)
     severity: Literal["low", "medium", "high", "critical"]
     timestamp: datetime
-    raw_message: Optional[str] = ""
+    raw_message: str | None = ""
 
 
 class IngestionRequest(BaseModel):
@@ -39,7 +39,7 @@ class IngestionRequest(BaseModel):
 class IngestionResponse(BaseModel):
     ingested: int
     failed: int
-    details: Optional[List[Dict[str, Any]]] = None
+    details: list[dict[str, Any]] | None = None
 
 
 class FirewallActionRequest(BaseModel):
@@ -58,20 +58,20 @@ class ThreatIntelResponse(BaseModel):
     ip: str
     reputation_score: int
     malicious: bool
-    country: Optional[str] = None
-    isp: Optional[str] = None
-    source: Optional[str] = "mock"
+    country: str | None = None
+    isp: str | None = None
+    source: str | None = "mock"
 
 
 class ThreatHuntRequest(BaseModel):
-    source_ip: Optional[str] = None
-    attack_type: Optional[str] = None
-    severity: Optional[Literal["low", "medium", "high", "critical"]] = None
+    source_ip: str | None = None
+    attack_type: str | None = None
+    severity: Literal["low", "medium", "high", "critical"] | None = None
 
 
 class ThreatHuntResponse(BaseModel):
     total: int
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
 
 
 class ReportRequest(BaseModel):
@@ -81,7 +81,7 @@ class ReportRequest(BaseModel):
 class ReportResponse(BaseModel):
     report_name: str
     report_path: str
-    generated_at: Optional[str] = None
+    generated_at: str | None = None
 
 
 class MLPredictRequest(BaseModel):
