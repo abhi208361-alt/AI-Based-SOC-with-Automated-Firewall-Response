@@ -1,21 +1,167 @@
-from __future__ import annotations
 
 import math
 import os
 import uuid
-from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
 from collections import defaultdict, deque
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Header, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 
-app = FastAPI(title="AI SOC Firewall", version="1.0.0")
+# =========================================================
+# Config (env-driven, production-safe defaults)
+# =========================================================
+APP_NAME = os.getenv("APP_NAME", "AI SOC Firewall")
+APP_VERSION = os.getenv("APP_VERSION", "1.1.0")
+ENV = os.getenv("ENV", "dev").lower()  # dev|test|prod
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", "true").lower() == "true"
+
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if ENV == "prod" and len(SECRET_KEY) < 32:
+    raise RuntimeError("In production, SECRET_KEY must be set and >= 32 chars.")
+
+CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+CORS_ORIGINS = [x.strip() for x in CORS_ORIGINS_RAW.split(",") if x.strip()]
+if ENV == "dev":
+    # dev convenience only
+    if "*" not in CORS_ORIGINS:
+        CORS_ORIGINS.append("*")
+
+RATE_LIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "120/minute")
+RATE_LIMIT_LOGIN = os.getenv("RATE_LIMIT_LOGIN", "5/minute")
+
+# =========================================================
+# App init
+# =========================================================
+app = FastAPI(
+    title=APP_NAME,
+    version=APP_VERSION,
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url="/redoc" if DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
+)
+
+# =========================================================
+# Metrics
+# =========================================================
+REQUEST_COUNT = Counter("http_requests_total", "Total HTTP requests", ["method", "path", "status"])
+REQUEST_LATENCY = Histogram("http_request_latency_seconds", "HTTP request latency", ["method", "path"])
+
+# =========================================================
+# Middleware: request-id, security headers, metrics
+# =========================================================
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        request.state.request_id = request_id
+        start = datetime.now(timezone.utc)
+
+        response = await call_next(request)
+
+        elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+        path = request.url.path
+        method = request.method
+        status_code = response.status_code
+
+        REQUEST_COUNT.labels(method=method, path=path, status=str(status_code)).inc()
+        REQUEST_LATENCY.labels(method=method, path=path).observe(elapsed)
+
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["X-XSS-Protection"] = "0"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "img-src 'self' data:; "
+            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self';"
+        )
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        return response
+
+
+app.add_middleware(RequestContextMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =========================================================
+# Rate limiting
+# =========================================================
+limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT_DEFAULT])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# =========================================================
+# Unified error envelope
+# =========================================================
+def _error_payload(code: str, message: str, request: Optional[Request] = None) -> Dict[str, Any]:
+    request_id = getattr(request.state, "request_id", "") if request else ""
+    return {
+        "error": {
+            "code": code,
+            "message": message,
+            "request_id": request_id,
+        }
+    }
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=_error_payload("VALIDATION_ERROR", "Request validation failed", request),
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_error_payload("HTTP_ERROR", str(exc.detail), request),
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=_error_payload("INTERNAL_SERVER_ERROR", "An unexpected error occurred", request),
+    )
 
 # =========================================================
 # Paths / Static
@@ -23,20 +169,7 @@ app = FastAPI(title="AI SOC Firewall", version="1.0.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REPORTS_DIR = os.path.join(BASE_DIR, "reports")
 os.makedirs(REPORTS_DIR, exist_ok=True)
-
-# Serves files like: http://127.0.0.1:8000/reports/<file>.pdf
 app.mount("/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
-
-# =========================================================
-# CORS (dev-friendly)
-# =========================================================
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # =========================================================
 # WS manager
@@ -96,7 +229,7 @@ class IncidentStore:
         return report
 
 # =========================================================
-# Threat detector (simple live scoring)
+# Threat detector
 # =========================================================
 @dataclass
 class DetectionResult:
@@ -107,6 +240,7 @@ class DetectionResult:
     reason: str
     mitre_techniques: List[str]
     recommended_action: str
+
 
 class ThreatDetector:
     def __init__(self) -> None:
@@ -149,10 +283,10 @@ class ThreatDetector:
         now = self._now()
         src = event.get("source_ip", "unknown")
         msg = f"{event.get('raw_message','')} {event.get('payload','')}".lower()
-        status = int(event.get("status_code", 0) or 0)
+        status_code = int(event.get("status_code", 0) or 0)
 
         self._push(self.ip_events[src], now)
-        if status in (401, 403):
+        if status_code in (401, 403):
             self._push(self.ip_failed_auth[src], now)
 
         c10 = self._count_within(self.ip_events[src], 10, now)
@@ -185,10 +319,10 @@ class ThreatDetector:
                 "XSS Attempt", "medium", 68, 0.85, "XSS signature found", ["T1189", "T1059"], "alert"
             )
 
-        a, a_reason = self._anomaly(c60)
-        risk = int(self._clamp(risk + a * 10, 0, 100))
-        conf = float(self._clamp(conf * 0.8 + a * 0.2, 0, 0.99))
-        reason = f"{reason}. anomaly({a_reason})"
+        anomaly_score, anomaly_reason = self._anomaly(c60)
+        risk = int(self._clamp(risk + anomaly_score * 10, 0, 100))
+        conf = float(self._clamp(conf * 0.8 + anomaly_score * 0.2, 0, 0.99))
+        reason = f"{reason}. anomaly({anomaly_reason})"
 
         if risk >= 85:
             severity = "critical"
@@ -204,12 +338,13 @@ class ThreatDetector:
             recommended_action=action,
         )
 
+
 store = IncidentStore()
 ws_manager = WSConnectionManager()
 detector = ThreatDetector()
 
 # =========================================================
-# Auth (DEV BYPASS: accepts any non-empty email/password)
+# Auth (dev token store)
 # =========================================================
 TOKENS: Dict[str, Dict[str, Any]] = {}
 
@@ -217,16 +352,19 @@ class LoginRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=120)
     password: str = Field(..., min_length=1)
 
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str
+
 
 class UserProfile(BaseModel):
     id: str
     email: str
     full_name: str
     role: str
+
 
 def get_current_user(authorization: Optional[str]) -> Dict[str, Any]:
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -250,9 +388,11 @@ class AttackLogIn(BaseModel):
     status_code: Optional[int] = 0
     payload: Optional[str] = ""
 
+
 class FirewallActionRequest(BaseModel):
     ip_address: str
     reason: str = Field(default="SOC analyst action", min_length=2, max_length=200)
+
 
 class FirewallActionResponse(BaseModel):
     success: bool
@@ -260,8 +400,10 @@ class FirewallActionResponse(BaseModel):
     ip_address: str
     action: str
 
+
 class ThreatIntelRequest(BaseModel):
     ip: str
+
 
 class ThreatIntelResponse(BaseModel):
     ip: str
@@ -271,22 +413,27 @@ class ThreatIntelResponse(BaseModel):
     isp: Optional[str] = None
     source: Optional[str] = "mock"
 
+
 class ReportRequest(BaseModel):
     incident_id: str
+
 
 class ReportResponse(BaseModel):
     report_name: str
     report_path: str
     generated_at: Optional[str] = None
 
+
 class ThreatHuntRequest(BaseModel):
     source_ip: Optional[str] = None
     attack_type: Optional[str] = None
     severity: Optional[str] = None
 
+
 class ThreatHuntResponse(BaseModel):
     total: int
     results: List[Dict[str, Any]]
+
 
 class MLPredictRequest(BaseModel):
     source_port: int
@@ -299,27 +446,50 @@ class MLPredictRequest(BaseModel):
     proto: str
     severity_num: int
 
+
 class IngestFileRequest(BaseModel):
     file_path: str
 
 # =========================================================
-# Routes
+# Core + health/readiness/metrics routes
 # =========================================================
 @app.get("/")
 def root():
     return {
         "message": "AI SOC Firewall backend is running",
         "health": "/api/v1/health",
-        "docs": "/docs",
+        "ready": "/api/v1/ready",
+        "metrics": "/api/v1/metrics",
+        "docs": "/docs" if DOCS_ENABLED else "disabled",
         "api_base": "/api/v1",
     }
 
+
 @app.get("/api/v1/health", tags=["Health"])
 def health():
-    return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
+    return {"status": "ok", "time": datetime.now(timezone.utc).isoformat(), "env": ENV}
 
+
+@app.get("/api/v1/ready", tags=["Health"])
+def ready():
+    # placeholder dependency checks (DB/Redis wiring in next PR)
+    checks = {
+        "database": "unknown",
+        "redis": "unknown",
+    }
+    return {"status": "ready", "checks": checks, "time": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/api/v1/metrics", tags=["Observability"])
+def metrics():
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+# =========================================================
+# Auth routes
+# =========================================================
 @app.post("/api/v1/auth/login", response_model=TokenResponse, tags=["Auth"])
-def login(req: LoginRequest):
+@limiter.limit(RATE_LIMIT_LOGIN)
+def login(request: Request, req: LoginRequest):
     if not req.email.strip() or not req.password.strip():
         raise HTTPException(status_code=400, detail="email/password required")
 
@@ -333,10 +503,14 @@ def login(req: LoginRequest):
     TOKENS[token] = user
     return {"access_token": token, "token_type": "bearer", "role": "admin"}
 
+
 @app.get("/api/v1/auth/me", response_model=UserProfile, tags=["Auth"])
 def me(authorization: Optional[str] = Header(default=None)):
     return get_current_user(authorization)
 
+# =========================================================
+# WS
+# =========================================================
 @app.websocket("/ws/attacks")
 async def ws_attacks(websocket: WebSocket):
     await ws_manager.connect(websocket)
@@ -348,16 +522,24 @@ async def ws_attacks(websocket: WebSocket):
     except Exception:
         ws_manager.disconnect(websocket)
 
+# =========================================================
+# Attacks
+# =========================================================
 @app.get("/api/v1/attacks", tags=["Attacks"])
+@limiter.limit(RATE_LIMIT_DEFAULT)
 def list_attacks(
+    request: Request,
     limit: int = Query(100, ge=1, le=1000),
     authorization: Optional[str] = Header(default=None),
 ):
     _ = get_current_user(authorization)
     return store.list_events(limit)
 
+
 @app.post("/api/v1/attacks", tags=["Attacks"])
+@limiter.limit(RATE_LIMIT_DEFAULT)
 async def create_attack(
+    request: Request,
     payload: AttackLogIn,
     authorization: Optional[str] = Header(default=None),
 ):
@@ -382,8 +564,12 @@ async def create_attack(
     await ws_manager.broadcast_json({"event": "new_attack", "data": saved})
     return saved
 
+# =========================================================
+# Firewall
+# =========================================================
 @app.post("/api/v1/firewall/block", response_model=FirewallActionResponse, tags=["Firewall"])
-def block_ip(req: FirewallActionRequest, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def block_ip(request: Request, req: FirewallActionRequest, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
     store.block_ip(req.ip_address)
     return {
@@ -393,8 +579,10 @@ def block_ip(req: FirewallActionRequest, authorization: Optional[str] = Header(d
         "action": "block",
     }
 
+
 @app.post("/api/v1/firewall/unblock", response_model=FirewallActionResponse, tags=["Firewall"])
-def unblock_ip(req: FirewallActionRequest, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def unblock_ip(request: Request, req: FirewallActionRequest, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
     store.unblock_ip(req.ip_address)
     return {
@@ -404,10 +592,14 @@ def unblock_ip(req: FirewallActionRequest, authorization: Optional[str] = Header
         "action": "unblock",
     }
 
+# =========================================================
+# Threat intel
+# =========================================================
 @app.get("/api/v1/threat-intel/check", response_model=ThreatIntelResponse, tags=["Threat Intelligence"])
-def check_ip_get(ip: str, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def check_ip_get(request: Request, ip: str, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
-    score = (sum(ord(c) for c in ip) % 100)
+    score = sum(ord(c) for c in ip) % 100
     return {
         "ip": ip,
         "reputation_score": score,
@@ -417,12 +609,18 @@ def check_ip_get(ip: str, authorization: Optional[str] = Header(default=None)):
         "source": "mock",
     }
 
-@app.post("/api/v1/threat-intel/check", response_model=ThreatIntelResponse, tags=["Threat Intelligence"])
-def check_ip_post(payload: ThreatIntelRequest, authorization: Optional[str] = Header(default=None)):
-    return check_ip_get(payload.ip, authorization)
 
+@app.post("/api/v1/threat-intel/check", response_model=ThreatIntelResponse, tags=["Threat Intelligence"])
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def check_ip_post(request: Request, payload: ThreatIntelRequest, authorization: Optional[str] = Header(default=None)):
+    return check_ip_get(request, payload.ip, authorization)
+
+# =========================================================
+# Reports
+# =========================================================
 @app.post("/api/v1/reports/generate", response_model=ReportResponse, tags=["Reports"])
-def generate(payload: ReportRequest, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def generate(request: Request, payload: ReportRequest, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
 
     incident = next((x for x in store.events if x.get("id") == payload.incident_id), None)
@@ -473,8 +671,12 @@ def generate(payload: ReportRequest, authorization: Optional[str] = Header(defau
     store.add_report(report)
     return report
 
+# =========================================================
+# Hunting / DB admin / ingestion / ML / geo / SIEM
+# =========================================================
 @app.post("/api/v1/hunting/search", response_model=ThreatHuntResponse, tags=["Threat Hunting"])
-def search_hunts(payload: ThreatHuntRequest, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def search_hunts(request: Request, payload: ThreatHuntRequest, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
     rows = store.events
 
@@ -487,38 +689,63 @@ def search_hunts(payload: ThreatHuntRequest, authorization: Optional[str] = Head
 
     return {"total": len(rows), "results": rows[:300]}
 
+
 @app.get("/api/v1/db/firewall-rules", tags=["DB Admin"])
-def list_firewall_rules(authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def list_firewall_rules(request: Request, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
     return [{"ip_address": ip, "status": "blocked"} for ip in sorted(store.blocked_ips)]
 
+
 @app.post("/api/v1/ingestion/file", tags=["Log Ingestion"])
-def ingest_from_file(payload: IngestFileRequest, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def ingest_from_file(request: Request, payload: IngestFileRequest, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
-    return {"message": "File ingestion queued", "file_path": payload.file_path}
+    p = Path(payload.file_path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="file_path not found")
+    if p.is_dir():
+        raise HTTPException(status_code=400, detail="file_path must be a file")
+    return {"message": "File ingestion queued", "file_path": str(p)}
+
 
 @app.post("/api/v1/ml/predict", tags=["ML"])
-def predict(payload: MLPredictRequest, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def predict(request: Request, payload: MLPredictRequest, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
-    score = min(100, max(0, int(
-        payload.request_rate * 0.5 +
-        payload.failed_logins * 3 +
-        payload.bytes_sent / 10000 +
-        payload.bytes_received / 10000 +
-        payload.severity_num * 10
-    )))
+    score = min(
+        100,
+        max(
+            0,
+            int(
+                payload.request_rate * 0.5
+                + payload.failed_logins * 3
+                + payload.bytes_sent / 10000
+                + payload.bytes_received / 10000
+                + payload.severity_num * 10
+            ),
+        ),
+    )
     label = "anomaly" if score >= 70 else "normal"
     return {"risk_score": score, "label": label}
 
+
 @app.get("/api/v1/geo/lookup", tags=["Geo"])
-def geo_lookup(ip: str, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def geo_lookup(request: Request, ip: str, authorization: Optional[str] = Header(default=None)):
     _ = get_current_user(authorization)
     seed = sum(ord(c) for c in ip)
     lat = (seed % 140) - 70
     lon = ((seed * 3) % 360) - 180
     return {"ip": ip, "latitude": lat, "longitude": lon, "country": "Mockland", "city": "Mock City"}
 
+
 @app.get("/api/v1/siem/export", tags=["SIEM"])
-def export_siem(limit: int = 500, authorization: Optional[str] = Header(default=None)):
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def export_siem(
+    request: Request,
+    limit: int = Query(500, ge=1, le=5000),
+    authorization: Optional[str] = Header(default=None),
+):
     _ = get_current_user(authorization)
     return {"count": min(limit, len(store.events)), "events": store.events[:limit]}

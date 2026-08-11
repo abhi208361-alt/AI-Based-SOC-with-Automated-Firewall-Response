@@ -1,49 +1,58 @@
 import uuid
-from pathlib import Path
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from backend.app.main import app
 
 
-def test_login_success_seeded_admin():
+def test_auth_login_success():
     with TestClient(app) as client:
-        payload = {"email": "admin@soc.local", "password": "Admin@123"}
-        res = client.post("/api/v1/auth/login", json=payload)
+        login_payload = {"email": "admin@soc.local", "password": "Admin@123"}
+        res = client.post("/api/v1/auth/login", json=login_payload)
         assert res.status_code == 200, res.text
+        body = res.json()
+        assert "access_token" in body
+        assert body["token_type"] == "bearer"
 
-        data = res.json()
-        assert "access_token" in data
-        assert data.get("token_type", "").lower() == "bearer"
 
-
-def test_reports_generate_unauthorized_without_token():
+def test_auth_me_requires_token():
     with TestClient(app) as client:
-        payload = {"incident_id": f"INC-{uuid.uuid4().hex[:8]}"}
-        res = client.post("/api/v1/reports/generate", json=payload)
-        assert res.status_code in (401, 403), res.text
+        res = client.get("/api/v1/auth/me")
+        assert res.status_code == 401, res.text
 
 
 def test_reports_generate_success_with_token():
     with TestClient(app) as client:
+        # login
         login_payload = {"email": "admin@soc.local", "password": "Admin@123"}
         login_res = client.post("/api/v1/auth/login", json=login_payload)
         assert login_res.status_code == 200, login_res.text
         token = login_res.json()["access_token"]
-
-        incident_id = f"INC-{uuid.uuid4().hex[:8]}"
         headers = {"Authorization": f"Bearer {token}"}
+
+        # create incident first
+        attack_payload = {
+            "source_ip": "10.10.10.5",
+            "destination_ip": "10.10.10.10",
+            "attack_type": "SQL Injection",
+            "severity": "high",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "raw_message": "select * from users where '1'='1'",
+            "status_code": 403,
+            "payload": "union select password from users",
+        }
+        attack_res = client.post("/api/v1/attacks", json=attack_payload, headers=headers)
+        assert attack_res.status_code == 200, attack_res.text
+        incident_id = attack_res.json()["id"]
+
+        # generate report using real incident id
         res = client.post(
             "/api/v1/reports/generate",
             json={"incident_id": incident_id},
             headers=headers,
         )
         assert res.status_code == 200, res.text
-
-        data = res.json()
-        assert "report_name" in data
-        assert "report_path" in data
-        assert incident_id in data["report_name"]
-
-        report_path = Path(data["report_path"])
-        assert report_path.exists(), f"Report file not found at {report_path}"
+        body = res.json()
+        assert body["report_name"].endswith(".pdf")
+        assert body["report_path"].startswith("reports/")

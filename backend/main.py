@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 import inspect
-
+from backend.app.main import app
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
