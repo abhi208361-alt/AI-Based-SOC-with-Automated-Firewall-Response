@@ -2,9 +2,9 @@ name: Smoke E2E
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -103,7 +103,7 @@ jobs:
         shell: bash
         run: |
           for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:8000/docs > /dev/null; then
+            if curl -fsS http://127.0.0.1:8000/api/v1/health > /dev/null; then
               echo "API is up"
               exit 0
             fi
