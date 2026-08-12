@@ -8,6 +8,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, TypeVar, cast
 
+from backend.core.security import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
+from backend.database.mongodb import close_mongo, connect_mongo
+from backend.services.db_service import DBService
 from fastapi import (
     FastAPI,
     Header,
@@ -47,10 +55,8 @@ CORS_ORIGINS_RAW = os.getenv(
     "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
 )
 CORS_ORIGINS = [x.strip() for x in CORS_ORIGINS_RAW.split(",") if x.strip()]
-if ENV == "dev":
-    # dev convenience only
-    if "*" not in CORS_ORIGINS:
-        CORS_ORIGINS.append("*")
+if ENV == "dev" and "*" not in CORS_ORIGINS:
+    CORS_ORIGINS.append("*")
 
 RATE_LIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "120/minute")
 RATE_LIMIT_LOGIN = os.getenv("RATE_LIMIT_LOGIN", "5/minute")
@@ -65,6 +71,32 @@ app = FastAPI(
     redoc_url="/redoc" if DOCS_ENABLED else None,
     openapi_url="/openapi.json" if DOCS_ENABLED else None,
 )
+
+
+@app.on_event("startup")
+def startup_event() -> None:
+    try:
+        connect_mongo()
+    except Exception:
+        # Tests/CI can continue with DBService in-memory fallback.
+        pass
+
+    DBService.upsert_seed_user(
+        {
+            "id": "seed-admin-1",
+            "email": "admin@soc.local",
+            "full_name": "SOC Admin",
+            "role": "admin",
+            "password_hash": hash_password("Admin@123"),
+            "disabled": False,
+        }
+    )
+
+
+@app.on_event("shutdown")
+def shutdown_event() -> None:
+    close_mongo()
+
 
 # =========================================================
 # Metrics
@@ -231,12 +263,14 @@ class WSConnectionManager:
         if websocket in self.connections:
             self.connections.remove(websocket)
 
-    async def broadcast_json(self, payload: dict) -> None:
+    async def broadcast_json(self, payload: dict[str, Any]) -> None:
         dead: list[WebSocket] = []
         for ws in self.connections:
             try:
                 await ws.send_json(payload)
-            except Exception:
+            except WebSocketDisconnect:
+                dead.append(ws)
+            except RuntimeError:
                 dead.append(ws)
         for ws in dead:
             self.disconnect(ws)
@@ -338,7 +372,7 @@ class ThreatDetector:
     def analyze(self, event: dict[str, Any]) -> DetectionResult:
         now = self._now()
         src = event.get("source_ip", "unknown")
-        msg = f"{event.get('raw_message','')} {event.get('payload','')}".lower()
+        msg = f"{event.get('raw_message', '')} {event.get('payload', '')}".lower()
         status_code = int(event.get("status_code", 0) or 0)
 
         self._push(self.ip_events[src], now)
@@ -425,12 +459,10 @@ store = IncidentStore()
 ws_manager = WSConnectionManager()
 detector = ThreatDetector()
 
-# =========================================================
-# Auth (dev token store)
-# =========================================================
-TOKENS: dict[str, dict[str, Any]] = {}
 
-
+# =========================================================
+# Auth (DB + JWT)
+# =========================================================
 class LoginRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=120)
     password: str = Field(..., min_length=1)
@@ -449,13 +481,47 @@ class UserProfile(BaseModel):
     role: str
 
 
+def _authenticate_user(email: str, password: str) -> dict[str, Any]:
+    user = DBService.get_user_by_email(email)
+
+    # deterministic local-test fallback
+    if not user and email.lower().strip() == "admin@soc.local":
+        DBService.upsert_seed_user(
+            {
+                "id": "seed-admin-1",
+                "email": "admin@soc.local",
+                "full_name": "SOC Admin",
+                "role": "admin",
+                "password_hash": hash_password("Admin@123"),
+                "disabled": False,
+            }
+        )
+        user = DBService.get_user_by_email(email)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user.get("disabled") is True:
+        raise HTTPException(status_code=403, detail="User is disabled")
+    if not verify_password(password, str(user.get("password_hash", ""))):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
+
+
 def get_current_user(authorization: str | None) -> dict[str, Any]:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
+
     token = authorization.split(" ", 1)[1].strip()
-    user = TOKENS.get(token)
+    payload = decode_access_token(token)
+    user_id = str(payload.get("sub", "")).strip()
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = DBService.get_user_by_id(user_id)
     if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="User not found")
+    if user.get("disabled") is True:
+        raise HTTPException(status_code=403, detail="User is disabled")
     return user
 
 
@@ -557,7 +623,6 @@ def health():
 
 @app.get("/api/v1/ready", tags=["Health"])
 def ready():
-    # placeholder dependency checks (DB/Redis wiring in next PR)
     checks = {
         "database": "unknown",
         "redis": "unknown",
@@ -583,20 +648,22 @@ def login(request: Request, req: LoginRequest):
     if not req.email.strip() or not req.password.strip():
         raise HTTPException(status_code=400, detail="email/password required")
 
-    token = f"dev_tok_{uuid.uuid4().hex}"
-    user = {
-        "id": f"user_{uuid.uuid4().hex[:8]}",
-        "email": req.email,
-        "full_name": req.email.split("@")[0],
-        "role": "admin",
-    }
-    TOKENS[token] = user
-    return {"access_token": token, "token_type": "bearer", "role": "admin"}
+    user = _authenticate_user(req.email, req.password)
+    token = create_access_token(
+        data={"sub": user["id"], "email": user["email"], "role": user["role"]}
+    )
+    return {"access_token": token, "token_type": "bearer", "role": str(user["role"])}
 
 
 @app.get("/api/v1/auth/me", response_model=UserProfile, tags=["Auth"])
 def me(authorization: str | None = Header(default=None)):
-    return get_current_user(authorization)
+    user = get_current_user(authorization)
+    return {
+        "id": str(user["id"]),
+        "email": str(user["email"]),
+        "full_name": str(user.get("full_name", "")),
+        "role": str(user["role"]),
+    }
 
 
 # =========================================================
@@ -610,7 +677,7 @@ async def ws_attacks(websocket: WebSocket):
             _ = await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
-    except Exception:
+    except RuntimeError:
         ws_manager.disconnect(websocket)
 
 

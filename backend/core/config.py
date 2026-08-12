@@ -13,6 +13,8 @@ class Settings(BaseModel):
 
     jwt_secret: str = os.getenv("JWT_SECRET", "change-this-secret-in-production")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+    jwt_issuer: str = os.getenv("JWT_ISSUER", "ai-soc-backend")
+    jwt_audience: str = os.getenv("JWT_AUDIENCE", "ai-soc-clients")
     access_token_expire_minutes: int = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
     )

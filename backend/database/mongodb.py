@@ -1,4 +1,4 @@
-from core.config import settings
+from backend.core.config import settings
 from pymongo import MongoClient
 
 _client = None
