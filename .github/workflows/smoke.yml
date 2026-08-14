@@ -96,7 +96,7 @@ jobs:
           MONGODB_DB: ai_soc_firewall
         run: |
           cd backend
-          nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 > ../api.log 2>&1 &
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > ../api.log 2>&1 &
           echo $! > ../api.pid
 
       - name: Wait for API
