@@ -1,6 +1,6 @@
+from core.security import require_role
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from core.security import require_role
 from services.ml_service import MLService
 
 router = APIRouter(prefix="/ml", tags=["ML"])

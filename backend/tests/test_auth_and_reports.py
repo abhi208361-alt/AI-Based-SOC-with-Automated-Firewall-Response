@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
@@ -42,7 +41,9 @@ def test_reports_generate_success_with_token():
             "status_code": 403,
             "payload": "union select password from users",
         }
-        attack_res = client.post("/api/v1/attacks", json=attack_payload, headers=headers)
+        attack_res = client.post(
+            "/api/v1/attacks", json=attack_payload, headers=headers
+        )
         assert attack_res.status_code == 200, attack_res.text
         incident_id = attack_res.json()["id"]
 

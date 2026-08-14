@@ -1,20 +1,37 @@
-
 import math
 import os
 import uuid
 from collections import defaultdict, deque
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, TypeVar, cast
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from backend.core.security import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
+from backend.database.mongodb import close_mongo, connect_mongo
+from backend.services.db_service import DBService
+from fastapi import (
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from pydantic import BaseModel, Field
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -34,12 +51,12 @@ SECRET_KEY = os.getenv("SECRET_KEY", "")
 if ENV == "prod" and len(SECRET_KEY) < 32:
     raise RuntimeError("In production, SECRET_KEY must be set and >= 32 chars.")
 
-CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+CORS_ORIGINS_RAW = os.getenv(
+    "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+)
 CORS_ORIGINS = [x.strip() for x in CORS_ORIGINS_RAW.split(",") if x.strip()]
-if ENV == "dev":
-    # dev convenience only
-    if "*" not in CORS_ORIGINS:
-        CORS_ORIGINS.append("*")
+if ENV == "dev" and "*" not in CORS_ORIGINS:
+    CORS_ORIGINS.append("*")
 
 RATE_LIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "120/minute")
 RATE_LIMIT_LOGIN = os.getenv("RATE_LIMIT_LOGIN", "5/minute")
@@ -55,11 +72,42 @@ app = FastAPI(
     openapi_url="/openapi.json" if DOCS_ENABLED else None,
 )
 
+
+@app.on_event("startup")
+def startup_event() -> None:
+    try:
+        connect_mongo()
+    except Exception:
+        # Tests/CI can continue with DBService in-memory fallback.
+        pass
+
+    DBService.upsert_seed_user(
+        {
+            "id": "seed-admin-1",
+            "email": "admin@soc.local",
+            "full_name": "SOC Admin",
+            "role": "admin",
+            "password_hash": hash_password("Admin@123"),
+            "disabled": False,
+        }
+    )
+
+
+@app.on_event("shutdown")
+def shutdown_event() -> None:
+    close_mongo()
+
+
 # =========================================================
 # Metrics
 # =========================================================
-REQUEST_COUNT = Counter("http_requests_total", "Total HTTP requests", ["method", "path", "status"])
-REQUEST_LATENCY = Histogram("http_request_latency_seconds", "HTTP request latency", ["method", "path"])
+REQUEST_COUNT = Counter(
+    "http_requests_total", "Total HTTP requests", ["method", "path", "status"]
+)
+REQUEST_LATENCY = Histogram(
+    "http_request_latency_seconds", "HTTP request latency", ["method", "path"]
+)
+
 
 # =========================================================
 # Middleware: request-id, security headers, metrics
@@ -91,7 +139,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=()"
+        )
         response.headers["X-XSS-Protection"] = "0"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -104,7 +154,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "form-action 'self';"
         )
         if request.url.scheme == "https":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
 
         return response
 
@@ -124,12 +176,29 @@ app.add_middleware(
 # =========================================================
 limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT_DEFAULT])
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+async def rate_limit_exception_handler(request: Request, exc: Exception) -> Response:
+    limited_exc = cast(RateLimitExceeded, exc)
+    handler = cast(
+        Callable[[Request, RateLimitExceeded], Response | Awaitable[Response]],
+        _rate_limit_exceeded_handler,
+    )
+    result = handler(request, limited_exc)
+    if hasattr(result, "__await__"):
+        return await cast(Awaitable[Response], result)
+    return cast(Response, result)
+
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
+
 
 # =========================================================
 # Unified error envelope
 # =========================================================
-def _error_payload(code: str, message: str, request: Optional[Request] = None) -> Dict[str, Any]:
+def _error_payload(
+    code: str, message: str, request: Request | None = None
+) -> dict[str, Any]:
     request_id = getattr(request.state, "request_id", "") if request else ""
     return {
         "error": {
@@ -141,15 +210,19 @@ def _error_payload(code: str, message: str, request: Optional[Request] = None) -
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=_error_payload("VALIDATION_ERROR", "Request validation failed", request),
+        content=_error_payload(
+            "VALIDATION_ERROR", "Request validation failed", request
+        ),
     )
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content=_error_payload("HTTP_ERROR", str(exc.detail), request),
@@ -157,11 +230,14 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=_error_payload("INTERNAL_SERVER_ERROR", "An unexpected error occurred", request),
+        content=_error_payload(
+            "INTERNAL_SERVER_ERROR", "An unexpected error occurred", request
+        ),
     )
+
 
 # =========================================================
 # Paths / Static
@@ -170,6 +246,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REPORTS_DIR = os.path.join(BASE_DIR, "reports")
 os.makedirs(REPORTS_DIR, exist_ok=True)
 app.mount("/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
+
 
 # =========================================================
 # WS manager
@@ -186,34 +263,39 @@ class WSConnectionManager:
         if websocket in self.connections:
             self.connections.remove(websocket)
 
-    async def broadcast_json(self, payload: dict) -> None:
-        dead: List[WebSocket] = []
+    async def broadcast_json(self, payload: dict[str, Any]) -> None:
+        dead: list[WebSocket] = []
         for ws in self.connections:
             try:
                 await ws.send_json(payload)
-            except Exception:
+            except WebSocketDisconnect:
+                dead.append(ws)
+            except RuntimeError:
                 dead.append(ws)
         for ws in dead:
             self.disconnect(ws)
+
 
 # =========================================================
 # In-memory stores
 # =========================================================
 class IncidentStore:
     def __init__(self) -> None:
-        self.events: List[Dict[str, Any]] = []
+        self.events: list[dict[str, Any]] = []
         self.blocked_ips: set[str] = set()
-        self.reports: List[Dict[str, Any]] = []
+        self.reports: list[dict[str, Any]] = []
 
-    def add_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    def add_event(self, event: dict[str, Any]) -> dict[str, Any]:
         item = dict(event)
         item["id"] = item.get("id") or f"evt_{uuid.uuid4().hex[:10]}"
-        item["timestamp"] = item.get("timestamp") or datetime.now(timezone.utc).isoformat()
+        item["timestamp"] = (
+            item.get("timestamp") or datetime.now(timezone.utc).isoformat()
+        )
         self.events.insert(0, item)
         self.events = self.events[:5000]
         return item
 
-    def list_events(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def list_events(self, limit: int = 100) -> list[dict[str, Any]]:
         return self.events[: max(1, min(limit, 1000))]
 
     def block_ip(self, ip: str) -> None:
@@ -223,10 +305,11 @@ class IncidentStore:
     def unblock_ip(self, ip: str) -> None:
         self.blocked_ips.discard(ip)
 
-    def add_report(self, report: Dict[str, Any]) -> Dict[str, Any]:
+    def add_report(self, report: dict[str, Any]) -> dict[str, Any]:
         self.reports.insert(0, report)
         self.reports = self.reports[:1000]
         return report
+
 
 # =========================================================
 # Threat detector
@@ -238,22 +321,29 @@ class DetectionResult:
     risk_score: int
     confidence: float
     reason: str
-    mitre_techniques: List[str]
+    mitre_techniques: list[str]
     recommended_action: str
+
+
+T = TypeVar("T")
 
 
 class ThreatDetector:
     def __init__(self) -> None:
-        self.ip_events: Dict[str, deque] = defaultdict(lambda: deque(maxlen=5000))
-        self.ip_failed_auth: Dict[str, deque] = defaultdict(lambda: deque(maxlen=2000))
-        self.global_count: deque = deque(maxlen=1440)
+        self.ip_events: dict[str, deque[datetime]] = defaultdict(
+            lambda: deque(maxlen=5000)
+        )
+        self.ip_failed_auth: dict[str, deque[datetime]] = defaultdict(
+            lambda: deque(maxlen=2000)
+        )
+        self.global_count: deque[int] = deque(maxlen=1440)
 
     @staticmethod
     def _now() -> datetime:
         return datetime.now(timezone.utc)
 
     @staticmethod
-    def _contains_any(text: str, needles: List[str]) -> bool:
+    def _contains_any(text: str, needles: list[str]) -> bool:
         t = (text or "").lower()
         return any(n in t for n in needles)
 
@@ -261,10 +351,10 @@ class ThreatDetector:
     def _clamp(v: float, lo: float, hi: float) -> float:
         return max(lo, min(hi, v))
 
-    def _push(self, bucket: deque, ts: datetime) -> None:
-        bucket.append(ts)
+    def _push(self, bucket: deque[T], value: T) -> None:
+        bucket.append(value)
 
-    def _count_within(self, bucket: deque, sec: int, now: datetime) -> int:
+    def _count_within(self, bucket: deque[datetime], sec: int, now: datetime) -> int:
         edge = now - timedelta(seconds=sec)
         return sum(1 for x in bucket if x >= edge)
 
@@ -279,10 +369,10 @@ class ThreatDetector:
         score = 1 / (1 + math.exp(-z))
         return score, f"z-score={z:.2f}"
 
-    def analyze(self, event: Dict[str, Any]) -> DetectionResult:
+    def analyze(self, event: dict[str, Any]) -> DetectionResult:
         now = self._now()
         src = event.get("source_ip", "unknown")
-        msg = f"{event.get('raw_message','')} {event.get('payload','')}".lower()
+        msg = f"{event.get('raw_message', '')} {event.get('payload', '')}".lower()
         status_code = int(event.get("status_code", 0) or 0)
 
         self._push(self.ip_events[src], now)
@@ -292,7 +382,7 @@ class ThreatDetector:
         c10 = self._count_within(self.ip_events[src], 10, now)
         c60 = self._count_within(self.ip_events[src], 60, now)
         f60 = self._count_within(self.ip_failed_auth[src], 60, now)
-        self.global_count.append(c60)
+        self._push(self.global_count, c60)
 
         attack_type = event.get("attack_type") or "Suspicious Activity"
         severity = event.get("severity") or "low"
@@ -304,19 +394,45 @@ class ThreatDetector:
 
         if c10 >= 25 or c60 >= 120:
             attack_type, severity, risk, conf, reason, mitre, action = (
-                "DDoS / Flood", "critical", 92, 0.93, f"Burst from {src}: {c10}/10s, {c60}/60s", ["T1498"], "block"
+                "DDoS / Flood",
+                "critical",
+                92,
+                0.93,
+                f"Burst from {src}: {c10}/10s, {c60}/60s",
+                ["T1498"],
+                "block",
             )
         elif f60 >= 12:
             attack_type, severity, risk, conf, reason, mitre, action = (
-                "Brute Force", "high", 84, 0.90, f"Failed auth burst from {src}: {f60}/60s", ["T1110"], "block"
+                "Brute Force",
+                "high",
+                84,
+                0.90,
+                f"Failed auth burst from {src}: {f60}/60s",
+                ["T1110"],
+                "block",
             )
-        elif self._contains_any(msg, [" union ", "select ", "' or 1=1", "sleep(", "information_schema"]):
+        elif self._contains_any(
+            msg, [" union ", "select ", "' or 1=1", "sleep(", "information_schema"]
+        ):
             attack_type, severity, risk, conf, reason, mitre, action = (
-                "SQL Injection", "high", 86, 0.91, "SQLi signature found", ["T1190", "T1059"], "block"
+                "SQL Injection",
+                "high",
+                86,
+                0.91,
+                "SQLi signature found",
+                ["T1190", "T1059"],
+                "block",
             )
         elif self._contains_any(msg, ["<script", "javascript:", "onerror=", "onload="]):
             attack_type, severity, risk, conf, reason, mitre, action = (
-                "XSS Attempt", "medium", 68, 0.85, "XSS signature found", ["T1189", "T1059"], "alert"
+                "XSS Attempt",
+                "medium",
+                68,
+                0.85,
+                "XSS signature found",
+                ["T1189", "T1059"],
+                "alert",
             )
 
         anomaly_score, anomaly_reason = self._anomaly(c60)
@@ -343,11 +459,10 @@ store = IncidentStore()
 ws_manager = WSConnectionManager()
 detector = ThreatDetector()
 
-# =========================================================
-# Auth (dev token store)
-# =========================================================
-TOKENS: Dict[str, Dict[str, Any]] = {}
 
+# =========================================================
+# Auth (DB + JWT)
+# =========================================================
 class LoginRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=120)
     password: str = Field(..., min_length=1)
@@ -366,14 +481,49 @@ class UserProfile(BaseModel):
     role: str
 
 
-def get_current_user(authorization: Optional[str]) -> Dict[str, Any]:
+def _authenticate_user(email: str, password: str) -> dict[str, Any]:
+    user = DBService.get_user_by_email(email)
+
+    # deterministic local-test fallback
+    if not user and email.lower().strip() == "admin@soc.local":
+        DBService.upsert_seed_user(
+            {
+                "id": "seed-admin-1",
+                "email": "admin@soc.local",
+                "full_name": "SOC Admin",
+                "role": "admin",
+                "password_hash": hash_password("Admin@123"),
+                "disabled": False,
+            }
+        )
+        user = DBService.get_user_by_email(email)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user.get("disabled") is True:
+        raise HTTPException(status_code=403, detail="User is disabled")
+    if not verify_password(password, str(user.get("password_hash", ""))):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
+
+
+def get_current_user(authorization: str | None) -> dict[str, Any]:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
+
     token = authorization.split(" ", 1)[1].strip()
-    user = TOKENS.get(token)
+    payload = decode_access_token(token)
+    user_id = str(payload.get("sub", "")).strip()
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = DBService.get_user_by_id(user_id)
     if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="User not found")
+    if user.get("disabled") is True:
+        raise HTTPException(status_code=403, detail="User is disabled")
     return user
+
 
 # =========================================================
 # Schemas
@@ -384,9 +534,9 @@ class AttackLogIn(BaseModel):
     attack_type: str = Field(..., min_length=2, max_length=100)
     severity: str
     timestamp: datetime
-    raw_message: Optional[str] = ""
-    status_code: Optional[int] = 0
-    payload: Optional[str] = ""
+    raw_message: str | None = ""
+    status_code: int | None = 0
+    payload: str | None = ""
 
 
 class FirewallActionRequest(BaseModel):
@@ -409,9 +559,9 @@ class ThreatIntelResponse(BaseModel):
     ip: str
     reputation_score: int
     malicious: bool
-    country: Optional[str] = None
-    isp: Optional[str] = None
-    source: Optional[str] = "mock"
+    country: str | None = None
+    isp: str | None = None
+    source: str | None = "mock"
 
 
 class ReportRequest(BaseModel):
@@ -421,18 +571,18 @@ class ReportRequest(BaseModel):
 class ReportResponse(BaseModel):
     report_name: str
     report_path: str
-    generated_at: Optional[str] = None
+    generated_at: str | None = None
 
 
 class ThreatHuntRequest(BaseModel):
-    source_ip: Optional[str] = None
-    attack_type: Optional[str] = None
-    severity: Optional[str] = None
+    source_ip: str | None = None
+    attack_type: str | None = None
+    severity: str | None = None
 
 
 class ThreatHuntResponse(BaseModel):
     total: int
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
 
 
 class MLPredictRequest(BaseModel):
@@ -449,6 +599,7 @@ class MLPredictRequest(BaseModel):
 
 class IngestFileRequest(BaseModel):
     file_path: str
+
 
 # =========================================================
 # Core + health/readiness/metrics routes
@@ -472,17 +623,21 @@ def health():
 
 @app.get("/api/v1/ready", tags=["Health"])
 def ready():
-    # placeholder dependency checks (DB/Redis wiring in next PR)
     checks = {
         "database": "unknown",
         "redis": "unknown",
     }
-    return {"status": "ready", "checks": checks, "time": datetime.now(timezone.utc).isoformat()}
+    return {
+        "status": "ready",
+        "checks": checks,
+        "time": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.get("/api/v1/metrics", tags=["Observability"])
 def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 # =========================================================
 # Auth routes
@@ -493,20 +648,23 @@ def login(request: Request, req: LoginRequest):
     if not req.email.strip() or not req.password.strip():
         raise HTTPException(status_code=400, detail="email/password required")
 
-    token = f"dev_tok_{uuid.uuid4().hex}"
-    user = {
-        "id": f"user_{uuid.uuid4().hex[:8]}",
-        "email": req.email,
-        "full_name": req.email.split("@")[0],
-        "role": "admin",
-    }
-    TOKENS[token] = user
-    return {"access_token": token, "token_type": "bearer", "role": "admin"}
+    user = _authenticate_user(req.email, req.password)
+    token = create_access_token(
+        data={"sub": user["id"], "email": user["email"], "role": user["role"]}
+    )
+    return {"access_token": token, "token_type": "bearer", "role": str(user["role"])}
 
 
 @app.get("/api/v1/auth/me", response_model=UserProfile, tags=["Auth"])
-def me(authorization: Optional[str] = Header(default=None)):
-    return get_current_user(authorization)
+def me(authorization: str | None = Header(default=None)):
+    user = get_current_user(authorization)
+    return {
+        "id": str(user["id"]),
+        "email": str(user["email"]),
+        "full_name": str(user.get("full_name", "")),
+        "role": str(user["role"]),
+    }
+
 
 # =========================================================
 # WS
@@ -519,8 +677,9 @@ async def ws_attacks(websocket: WebSocket):
             _ = await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
-    except Exception:
+    except RuntimeError:
         ws_manager.disconnect(websocket)
+
 
 # =========================================================
 # Attacks
@@ -530,7 +689,7 @@ async def ws_attacks(websocket: WebSocket):
 def list_attacks(
     request: Request,
     limit: int = Query(100, ge=1, le=1000),
-    authorization: Optional[str] = Header(default=None),
+    authorization: str | None = Header(default=None),
 ):
     _ = get_current_user(authorization)
     return store.list_events(limit)
@@ -541,7 +700,7 @@ def list_attacks(
 async def create_attack(
     request: Request,
     payload: AttackLogIn,
-    authorization: Optional[str] = Header(default=None),
+    authorization: str | None = Header(default=None),
 ):
     _ = get_current_user(authorization)
 
@@ -564,12 +723,19 @@ async def create_attack(
     await ws_manager.broadcast_json({"event": "new_attack", "data": saved})
     return saved
 
+
 # =========================================================
 # Firewall
 # =========================================================
-@app.post("/api/v1/firewall/block", response_model=FirewallActionResponse, tags=["Firewall"])
+@app.post(
+    "/api/v1/firewall/block", response_model=FirewallActionResponse, tags=["Firewall"]
+)
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def block_ip(request: Request, req: FirewallActionRequest, authorization: Optional[str] = Header(default=None)):
+def block_ip(
+    request: Request,
+    req: FirewallActionRequest,
+    authorization: str | None = Header(default=None),
+):
     _ = get_current_user(authorization)
     store.block_ip(req.ip_address)
     return {
@@ -580,9 +746,15 @@ def block_ip(request: Request, req: FirewallActionRequest, authorization: Option
     }
 
 
-@app.post("/api/v1/firewall/unblock", response_model=FirewallActionResponse, tags=["Firewall"])
+@app.post(
+    "/api/v1/firewall/unblock", response_model=FirewallActionResponse, tags=["Firewall"]
+)
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def unblock_ip(request: Request, req: FirewallActionRequest, authorization: Optional[str] = Header(default=None)):
+def unblock_ip(
+    request: Request,
+    req: FirewallActionRequest,
+    authorization: str | None = Header(default=None),
+):
     _ = get_current_user(authorization)
     store.unblock_ip(req.ip_address)
     return {
@@ -592,12 +764,19 @@ def unblock_ip(request: Request, req: FirewallActionRequest, authorization: Opti
         "action": "unblock",
     }
 
+
 # =========================================================
 # Threat intel
 # =========================================================
-@app.get("/api/v1/threat-intel/check", response_model=ThreatIntelResponse, tags=["Threat Intelligence"])
+@app.get(
+    "/api/v1/threat-intel/check",
+    response_model=ThreatIntelResponse,
+    tags=["Threat Intelligence"],
+)
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def check_ip_get(request: Request, ip: str, authorization: Optional[str] = Header(default=None)):
+def check_ip_get(
+    request: Request, ip: str, authorization: str | None = Header(default=None)
+):
     _ = get_current_user(authorization)
     score = sum(ord(c) for c in ip) % 100
     return {
@@ -610,20 +789,35 @@ def check_ip_get(request: Request, ip: str, authorization: Optional[str] = Heade
     }
 
 
-@app.post("/api/v1/threat-intel/check", response_model=ThreatIntelResponse, tags=["Threat Intelligence"])
+@app.post(
+    "/api/v1/threat-intel/check",
+    response_model=ThreatIntelResponse,
+    tags=["Threat Intelligence"],
+)
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def check_ip_post(request: Request, payload: ThreatIntelRequest, authorization: Optional[str] = Header(default=None)):
+def check_ip_post(
+    request: Request,
+    payload: ThreatIntelRequest,
+    authorization: str | None = Header(default=None),
+):
     return check_ip_get(request, payload.ip, authorization)
+
 
 # =========================================================
 # Reports
 # =========================================================
 @app.post("/api/v1/reports/generate", response_model=ReportResponse, tags=["Reports"])
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def generate(request: Request, payload: ReportRequest, authorization: Optional[str] = Header(default=None)):
+def generate(
+    request: Request,
+    payload: ReportRequest,
+    authorization: str | None = Header(default=None),
+):
     _ = get_current_user(authorization)
 
-    incident = next((x for x in store.events if x.get("id") == payload.incident_id), None)
+    incident = next(
+        (x for x in store.events if x.get("id") == payload.incident_id), None
+    )
     if not incident:
         raise HTTPException(status_code=404, detail="incident_id not found")
 
@@ -671,35 +865,56 @@ def generate(request: Request, payload: ReportRequest, authorization: Optional[s
     store.add_report(report)
     return report
 
+
 # =========================================================
 # Hunting / DB admin / ingestion / ML / geo / SIEM
 # =========================================================
-@app.post("/api/v1/hunting/search", response_model=ThreatHuntResponse, tags=["Threat Hunting"])
+@app.post(
+    "/api/v1/hunting/search", response_model=ThreatHuntResponse, tags=["Threat Hunting"]
+)
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def search_hunts(request: Request, payload: ThreatHuntRequest, authorization: Optional[str] = Header(default=None)):
+def search_hunts(
+    request: Request,
+    payload: ThreatHuntRequest,
+    authorization: str | None = Header(default=None),
+):
     _ = get_current_user(authorization)
     rows = store.events
 
     if payload.source_ip:
         rows = [r for r in rows if r.get("source_ip") == payload.source_ip]
     if payload.attack_type:
-        rows = [r for r in rows if (r.get("attack_type", "") or "").lower() == payload.attack_type.lower()]
+        rows = [
+            r
+            for r in rows
+            if (r.get("attack_type", "") or "").lower() == payload.attack_type.lower()
+        ]
     if payload.severity:
-        rows = [r for r in rows if (r.get("severity", "") or "").lower() == payload.severity.lower()]
+        rows = [
+            r
+            for r in rows
+            if (r.get("severity", "") or "").lower() == payload.severity.lower()
+        ]
 
     return {"total": len(rows), "results": rows[:300]}
 
 
 @app.get("/api/v1/db/firewall-rules", tags=["DB Admin"])
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def list_firewall_rules(request: Request, authorization: Optional[str] = Header(default=None)):
+def list_firewall_rules(
+    request: Request, authorization: str | None = Header(default=None)
+):
     _ = get_current_user(authorization)
     return [{"ip_address": ip, "status": "blocked"} for ip in sorted(store.blocked_ips)]
 
 
 @app.post("/api/v1/ingestion/file", tags=["Log Ingestion"])
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def ingest_from_file(request: Request, payload: IngestFileRequest, authorization: Optional[str] = Header(default=None)):
+def ingest_from_file(
+    request: Request,
+    payload: IngestFileRequest,
+    authorization: str | None = Header(default=None),
+):
     _ = get_current_user(authorization)
     p = Path(payload.file_path)
     if not p.exists():
@@ -711,7 +926,11 @@ def ingest_from_file(request: Request, payload: IngestFileRequest, authorization
 
 @app.post("/api/v1/ml/predict", tags=["ML"])
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def predict(request: Request, payload: MLPredictRequest, authorization: Optional[str] = Header(default=None)):
+def predict(
+    request: Request,
+    payload: MLPredictRequest,
+    authorization: str | None = Header(default=None),
+):
     _ = get_current_user(authorization)
     score = min(
         100,
@@ -732,12 +951,20 @@ def predict(request: Request, payload: MLPredictRequest, authorization: Optional
 
 @app.get("/api/v1/geo/lookup", tags=["Geo"])
 @limiter.limit(RATE_LIMIT_DEFAULT)
-def geo_lookup(request: Request, ip: str, authorization: Optional[str] = Header(default=None)):
+def geo_lookup(
+    request: Request, ip: str, authorization: str | None = Header(default=None)
+):
     _ = get_current_user(authorization)
     seed = sum(ord(c) for c in ip)
     lat = (seed % 140) - 70
     lon = ((seed * 3) % 360) - 180
-    return {"ip": ip, "latitude": lat, "longitude": lon, "country": "Mockland", "city": "Mock City"}
+    return {
+        "ip": ip,
+        "latitude": lat,
+        "longitude": lon,
+        "country": "Mockland",
+        "city": "Mock City",
+    }
 
 
 @app.get("/api/v1/siem/export", tags=["SIEM"])
@@ -745,7 +972,7 @@ def geo_lookup(request: Request, ip: str, authorization: Optional[str] = Header(
 def export_siem(
     request: Request,
     limit: int = Query(500, ge=1, le=5000),
-    authorization: Optional[str] = Header(default=None),
+    authorization: str | None = Header(default=None),
 ):
     _ = get_current_user(authorization)
     return {"count": min(limit, len(store.events)), "events": store.events[:limit]}

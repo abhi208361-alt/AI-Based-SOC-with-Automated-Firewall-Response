@@ -11,7 +11,10 @@ class HuntingService:
         for r in records:
             if query.source_ip and r["source_ip"] != query.source_ip:
                 continue
-            if query.attack_type and query.attack_type.lower() not in r["attack_type"].lower():
+            if (
+                query.attack_type
+                and query.attack_type.lower() not in r["attack_type"].lower()
+            ):
                 continue
             if query.severity and r["severity"] != query.severity:
                 continue

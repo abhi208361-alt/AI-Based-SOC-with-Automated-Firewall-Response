@@ -1,4 +1,5 @@
 import os
+
 from pydantic import BaseModel
 
 
@@ -12,11 +13,19 @@ class Settings(BaseModel):
 
     jwt_secret: str = os.getenv("JWT_SECRET", "change-this-secret-in-production")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
-    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+    jwt_issuer: str = os.getenv("JWT_ISSUER", "ai-soc-backend")
+    jwt_audience: str = os.getenv("JWT_AUDIENCE", "ai-soc-clients")
+    access_token_expire_minutes: int = int(
+        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
+    )
 
     abuseipdb_api_key: str = os.getenv("ABUSEIPDB_API_KEY", "")
-    abuseipdb_base_url: str = os.getenv("ABUSEIPDB_BASE_URL", "https://api.abuseipdb.com/api/v2/check")
-    threat_intel_cache_ttl_seconds: int = int(os.getenv("THREAT_INTEL_CACHE_TTL_SECONDS", "300"))
+    abuseipdb_base_url: str = os.getenv(
+        "ABUSEIPDB_BASE_URL", "https://api.abuseipdb.com/api/v2/check"
+    )
+    threat_intel_cache_ttl_seconds: int = int(
+        os.getenv("THREAT_INTEL_CACHE_TTL_SECONDS", "300")
+    )
 
 
 settings = Settings()

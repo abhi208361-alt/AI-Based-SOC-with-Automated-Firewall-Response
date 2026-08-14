@@ -1,5 +1,5 @@
+from backend.core.config import settings
 from pymongo import MongoClient
-from core.config import settings
 
 _client = None
 _db = None

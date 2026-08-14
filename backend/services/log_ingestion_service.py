@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from log_parser import parse_log_line
 from services.attack_service import AttackService
 
@@ -8,7 +9,12 @@ class LogIngestionService:
     def ingest_file(file_path: str) -> dict:
         p = Path(file_path)
         if not p.exists():
-            return {"success": False, "ingested": 0, "failed": 0, "errors": [f"File not found: {file_path}"]}
+            return {
+                "success": False,
+                "ingested": 0,
+                "failed": 0,
+                "errors": [f"File not found: {file_path}"],
+            }
 
         ingested = 0
         failed = 0
@@ -25,6 +31,11 @@ class LogIngestionService:
                     ingested += 1
                 except Exception as ex:
                     failed += 1
-                    errors.append(f"line {idx}: {str(ex)}")
+                    errors.append(f"line {idx}: {ex!s}")
 
-        return {"success": True, "ingested": ingested, "failed": failed, "errors": errors[:20]}
+        return {
+            "success": True,
+            "ingested": ingested,
+            "failed": failed,
+            "errors": errors[:20],
+        }

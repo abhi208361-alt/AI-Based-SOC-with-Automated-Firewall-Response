@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Tuple
-import math
+from typing import Any, TypeVar
 
 
 @dataclass
@@ -14,8 +14,11 @@ class DetectionResult:
     risk_score: int
     confidence: float
     reason: str
-    mitre_techniques: List[str]
+    mitre_techniques: list[str]
     recommended_action: str
+
+
+T = TypeVar("T")
 
 
 class ThreatDetector:
@@ -27,9 +30,13 @@ class ThreatDetector:
     """
 
     def __init__(self) -> None:
-        self.ip_events: Dict[str, deque] = defaultdict(lambda: deque(maxlen=5000))
-        self.ip_failed_auth: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
-        self.global_counts: deque = deque(maxlen=1440)  # minute buckets (24h)
+        self.ip_events: dict[str, deque[datetime]] = defaultdict(
+            lambda: deque(maxlen=5000)
+        )
+        self.ip_failed_auth: dict[str, deque[datetime]] = defaultdict(
+            lambda: deque(maxlen=1000)
+        )
+        self.global_counts: deque[int] = deque(maxlen=1440)  # minute buckets (24h)
 
     @staticmethod
     def _now() -> datetime:
@@ -40,18 +47,20 @@ class ThreatDetector:
         return max(lo, min(hi, v))
 
     @staticmethod
-    def _contains_any(text: str, needles: List[str]) -> bool:
+    def _contains_any(text: str, needles: list[str]) -> bool:
         t = (text or "").lower()
         return any(n in t for n in needles)
 
-    def _push(self, bucket: deque, ts: datetime) -> None:
-        bucket.append(ts)
+    def _push(self, bucket: deque[T], value: T) -> None:
+        bucket.append(value)
 
-    def _count_within(self, bucket: deque, window_sec: int, now: datetime) -> int:
+    def _count_within(
+        self, bucket: deque[datetime], window_sec: int, now: datetime
+    ) -> int:
         threshold = now - timedelta(seconds=window_sec)
         return sum(1 for t in bucket if t >= threshold)
 
-    def _anomaly_score(self, current_count: int) -> Tuple[float, str]:
+    def _anomaly_score(self, current_count: int) -> tuple[float, str]:
         # baseline from global per-minute counts
         values = [x for x in self.global_counts]
         if len(values) < 30:
@@ -65,7 +74,7 @@ class ThreatDetector:
         score = 1 / (1 + math.exp(-z))
         return float(score), f"Traffic anomaly z-score={z:.2f}"
 
-    def analyze(self, event: Dict[str, Any]) -> DetectionResult:
+    def analyze(self, event: dict[str, Any]) -> DetectionResult:
         now = self._now()
         source_ip = event.get("source_ip", "unknown")
         message = str(event.get("message", "")) + " " + str(event.get("payload", ""))
@@ -112,7 +121,9 @@ class ThreatDetector:
             mitre = ["T1110"]
             action = "block"
 
-        elif self._contains_any(message, ["select ", " union ", "' or 1=1", "sleep(", "information_schema"]):
+        elif self._contains_any(
+            message, ["select ", " union ", "' or 1=1", "sleep(", "information_schema"]
+        ):
             attack_type = "SQL Injection"
             severity = "high"
             risk = 86
@@ -121,7 +132,9 @@ class ThreatDetector:
             mitre = ["T1190", "T1059"]
             action = "block"
 
-        elif self._contains_any(message, ["<script", "javascript:", "onerror=", "onload="]):
+        elif self._contains_any(
+            message, ["<script", "javascript:", "onerror=", "onload="]
+        ):
             attack_type = "XSS Attempt"
             severity = "medium"
             risk = 68

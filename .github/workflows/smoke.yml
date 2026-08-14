@@ -36,12 +36,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          if [ -f "./backend/requirements.txt" ]; then
-            pip install -r ./backend/requirements.txt
-          else
-            echo "backend/requirements.txt not found" >&2
-            exit 1
-          fi
+          pip install -r ./backend/requirements.txt
           pip install pymongo python-jose[cryptography] passlib[bcrypt] python-multipart httpx joblib scikit-learn numpy pandas
 
       - name: Prepare ML artifacts
@@ -52,7 +47,7 @@ jobs:
           elif [ -f "./backend/rebuild_models_9f.py" ]; then
             python ./backend/rebuild_models_9f.py
           else
-            echo "rebuild_models_9f.py not found in repo root or backend/" >&2
+            echo "rebuild_models_9f.py not found" >&2
             exit 1
           fi
 
@@ -70,34 +65,34 @@ jobs:
           db_name = os.getenv("MONGODB_DB", "ai_soc_firewall")
 
           client = MongoClient(uri)
-          db = client[db_name]
-          users = db["users"]
+          users = client[db_name]["users"]
 
-          plain = "admin123"
-
-          doc = {
-            "username": "admin",
-            "email": "admin@example.com",
-            "role": "admin",
-            "is_active": True,
-            "password": plain,
-            "hashed_password": plain,
-            "password_plain": plain
-          }
-
-          users.update_one({"username": "admin"}, {"$set": doc}, upsert=True)
-          print("Seeded/updated admin user (plain fallback).")
+          users.update_one(
+              {"username": "admin"},
+              {
+                  "$set": {
+                      "username": "admin",
+                      "email": "admin@example.com",
+                      "role": "admin",
+                      "is_active": True,
+                      "password": "admin123",
+                      "hashed_password": "admin123",
+                      "password_plain": "admin123",
+                  }
+              },
+              upsert=True,
+          )
+          print("Seeded admin user.")
           PY
 
-      - name: Start API (background)
+      - name: Start API
         shell: bash
         env:
           MONGODB_URI: mongodb://127.0.0.1:27017
           MONGODB_DB: ai_soc_firewall
         run: |
-          cd backend
-          nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 > ../api.log 2>&1 &
-          echo $! > ../api.pid
+          nohup python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 > api.log 2>&1 &
+          echo $! > api.pid
 
       - name: Wait for API
         shell: bash
@@ -116,4 +111,8 @@ jobs:
       - name: Run smoke E2E script
         shell: bash
         run: |
-          pwsh -File ./scripts/smoke_e2e.ps1 || (echo "---- api.log ----" && tail -n 300 api.log && exit 1)
+          pwsh -File ./scripts/smoke_e2e.ps1 || (
+            echo "---- api.log ----"
+            tail -n 300 api.log
+            exit 1
+          )

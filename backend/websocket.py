@@ -1,12 +1,12 @@
-from fastapi import WebSocket
-from typing import List
-import json
 import asyncio
+import json
+
+from fastapi import WebSocket
 
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
         self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket):

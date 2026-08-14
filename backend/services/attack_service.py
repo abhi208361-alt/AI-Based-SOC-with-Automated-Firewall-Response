@@ -1,11 +1,12 @@
-import random
 import asyncio
+import random
+
 from models.schemas import AttackLogIn
 from services.db_service import DBService
-from services.ml_service import MLService
-from websocket import ws_manager
-from services.playbook_service import PlaybookService
 from services.mitre_service import MitreService
+from services.ml_service import MLService
+from services.playbook_service import PlaybookService
+from websocket import ws_manager
 
 SEVERITY_TO_NUM = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
@@ -18,7 +19,11 @@ class AttackService:
             "dest_port": random.choice([22, 80, 443, 3389, 445, 53, 8080]),
             "bytes_sent": random.randint(200, 2500),
             "bytes_received": random.randint(200, 3000),
-            "failed_logins": random.randint(0, 30) if "brute" in log_in.attack_type.lower() else random.randint(0, 5),
+            "failed_logins": (
+                random.randint(0, 30)
+                if "brute" in log_in.attack_type.lower()
+                else random.randint(0, 5)
+            ),
             "request_rate": random.randint(1, 120),
             "is_internal_src": 0,
             "proto": "tcp",
@@ -53,10 +58,9 @@ class AttackService:
 
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(ws_manager.broadcast({
-                "event": "new_attack",
-                "data": saved
-            }))
+            loop.create_task(
+                ws_manager.broadcast({"event": "new_attack", "data": saved})
+            )
         except RuntimeError:
             pass
 

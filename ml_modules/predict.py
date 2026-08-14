@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
+
 import joblib
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -64,6 +65,6 @@ if __name__ == "__main__":
         "request_rate": 16,
         "is_internal_src": 0,
         "proto": "tcp",
-        "severity_num": 3
+        "severity_num": 3,
     }
     print(json.dumps(predict_one(sample), indent=2))
