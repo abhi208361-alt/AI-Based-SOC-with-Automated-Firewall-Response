@@ -1,9 +1,9 @@
 import ipaddress
 
-from core.security import require_role
+from backend.core.security import require_role
 from fastapi import APIRouter, Depends, HTTPException
 from models.schemas import FirewallActionRequest, FirewallActionResponse
-from services.db_service import DBService
+from backend.services.db_service import DBService
 
 router = APIRouter(prefix="/firewall", tags=["Firewall"])
 
@@ -59,3 +59,4 @@ def unblock_ip(payload: FirewallActionRequest):
         "ip_address": str(payload.ip_address),
         "action": "unblock",
     }
+

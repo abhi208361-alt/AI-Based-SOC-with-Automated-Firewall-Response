@@ -30,8 +30,8 @@ new = '''return [ThreatIntelEnrichmentResponse(**r) for r in results]
 # Threat Intel + Firewall Integration
 # =========================================================
 
-from backend.app.core.config import settings
-from backend.app.schemas.common import BaseSchema, Field
+from app.core.config import settings
+from app.schemas.common import BaseSchema, Field
 
 
 class AutoBlockTriggerRequest(BaseSchema):
@@ -149,3 +149,4 @@ else:
         print('Found return statement')
     if '@router.delete("/iocs/{ioc_id}"' in content:
         print('Found delete route')
+

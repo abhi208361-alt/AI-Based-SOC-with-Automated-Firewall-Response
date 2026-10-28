@@ -18,9 +18,9 @@ from uuid import UUID
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from backend.app.core.auth import hash_password, verify_password
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.models.user import (
+from app.core.auth import hash_password, verify_password
+from app.core.exceptions import NotFoundError, ValidationError
+from app.models.user import (
     Permission,
     Role,
     RoleModel,
@@ -28,7 +28,7 @@ from backend.app.models.user import (
     User,
     UserRole,
 )
-from backend.app.schemas.common import (
+from app.schemas.common import (
     MFASetupResponse,
     RoleCreate,
     RoleUpdate,
@@ -473,3 +473,4 @@ class AuthService:
         self.db.commit()
         self.db.refresh(role)
         return role
+

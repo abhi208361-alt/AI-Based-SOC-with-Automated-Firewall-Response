@@ -10,3 +10,4 @@ result = verify_password('Admin@123', hashed)
 print(f'verify_password(Admin@123, hashed): {result}')
 result2 = verify_password('WrongPassword', hashed)
 print(f'verify_password(WrongPassword, hashed): {result2}')
+

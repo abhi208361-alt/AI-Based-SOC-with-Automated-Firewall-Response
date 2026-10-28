@@ -3,7 +3,7 @@ API v1 package.
 
 This module aggregates all v1 API routers.
 """
-from backend.app.api.v1 import (
+from app.api.v1 import (
     auth,
     users,
     alerts,
@@ -30,3 +30,4 @@ __all__ = [
     "notifications",
     "admin",
 ]
+

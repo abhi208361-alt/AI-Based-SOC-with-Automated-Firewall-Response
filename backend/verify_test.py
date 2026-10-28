@@ -21,3 +21,4 @@ print()
 print("Hash format check:")
 print("  starts with $pbkdf2-sha256$: ", new_hash.startswith("$pbkdf2-sha256$"))
 print("  contains 29000: ", "29000" in new_hash)
+

@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class ReportType(str, enum.Enum):
@@ -211,3 +211,4 @@ class ReportSchedule(Base):
     
     def __repr__(self) -> str:
         return f"<ReportSchedule(id={self.id}, schedule_id={self.schedule_id}, name={self.name}, active={self.is_active})>"
+

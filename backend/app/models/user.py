@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class Permission(str, enum.Enum):
@@ -301,3 +301,4 @@ class RolePermission(Base):
     # Relationships
     role: Mapped[RoleModel] = relationship("RoleModel", back_populates="permissions")
     grantor: Mapped[Optional[User]] = relationship("User", foreign_keys=[granted_by])
+

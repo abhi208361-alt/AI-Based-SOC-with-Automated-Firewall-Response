@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from backend.models.schemas import DashboardKPI, IncidentCreate, IncidentResponse, ThreatIntelMetric, SystemHealthMetric, SimulationRequest, AuditEventCreate
+from models.schemas import DashboardKPI, IncidentCreate, IncidentResponse, ThreatIntelMetric, SystemHealthMetric, SimulationRequest, AuditEventCreate
 from backend.services.db_service import DBService
 from typing import List, Dict, Any
 
@@ -52,3 +52,4 @@ def get_incidents_summary() -> Dict[str, Any]:
         "resolved": resolved,
         "severity_counts": severity_counts,
     }
+

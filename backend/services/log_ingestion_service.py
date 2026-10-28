@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from log_parser import parse_log_line
-from services.attack_service import AttackService
+from backend.services.attack_service import AttackService
 
 
 class LogIngestionService:
@@ -39,3 +39,4 @@ class LogIngestionService:
             "failed": failed,
             "errors": errors[:20],
         }
+

@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class PlaybookStatus(str, enum.Enum):
@@ -342,3 +342,4 @@ class PlaybookStepExecution(Base):
     
     def __repr__(self) -> str:
         return f"<PlaybookStepExecution(execution_id={self.execution_id}, step={self.step_name}, status={self.status.value})>"
+

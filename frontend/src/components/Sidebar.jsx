@@ -1,14 +1,11 @@
 import { NavLink } from "react-router-dom";
 import {
   Activity,
-  Bot,
   FileBarChart,
   FileText,
-  HeartPulse,
   LayoutDashboard,
   Settings,
   Shield,
-  ShieldAlert,
   X,
 } from "lucide-react";
 
@@ -17,16 +14,6 @@ const navigationItems = [
     label: "Dashboard",
     path: "/dashboard",
     icon: LayoutDashboard,
-  },
-  {
-    label: "Threats",
-    path: "/threats",
-    icon: ShieldAlert,
-  },
-  {
-    label: "System Health",
-    path: "/system-health",
-    icon: HeartPulse,
   },
   {
     label: "Attack Logs",
@@ -44,11 +31,6 @@ const navigationItems = [
     icon: FileBarChart,
   },
   {
-    label: "AI Assistant",
-    path: "/assistant",
-    icon: Bot,
-  },
-  {
     label: "Settings",
     path: "/settings",
     icon: Settings,
@@ -59,10 +41,7 @@ function getInitials() {
   return "AI";
 }
 
-export default function Sidebar({
-  open = false,
-  onClose,
-}) {
+export default function Sidebar({ open = false, onClose }) {
   return (
     <aside
       className={`fixed inset-y-0 left-0 z-50 flex w-[238px] flex-col border-r border-cyan-900/70 bg-[#03152b] shadow-2xl shadow-black/30 transition-transform duration-300 lg:translate-x-0 ${
@@ -137,12 +116,6 @@ export default function Sidebar({
                 />
 
                 <span className="flex-1">{label}</span>
-
-                {label === "Threats" && (
-                  <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] text-red-300">
-                    Live
-                  </span>
-                )}
               </>
             )}
           </NavLink>

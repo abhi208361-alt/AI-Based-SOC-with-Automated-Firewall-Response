@@ -11,8 +11,8 @@ from uuid import UUID
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.models.incident import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.models.incident import (
     Incident,
     IncidentEvidence,
     IncidentNote,
@@ -21,7 +21,7 @@ from backend.app.models.incident import (
     IncidentTimelineEvent,
     IncidentType,
 )
-from backend.app.schemas.common import (
+from app.schemas.common import (
     IncidentCreate,
     IncidentUpdate,
 )
@@ -271,3 +271,4 @@ class IncidentService:
         self.db.commit()
         self.db.refresh(incident)
         return incident
+

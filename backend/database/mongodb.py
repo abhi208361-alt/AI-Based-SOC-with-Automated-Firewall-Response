@@ -24,3 +24,4 @@ def db():
     if _db is None:
         raise RuntimeError("MongoDB is not connected. Call connect_mongo() first.")
     return _db
+

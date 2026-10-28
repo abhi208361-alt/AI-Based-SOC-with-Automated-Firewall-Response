@@ -66,3 +66,4 @@ with open(os.path.join(base, "model_metadata.json"), "w") as f:
 
 print("Models trained and saved successfully!")
 print("Feature cols:", feature_cols)
+

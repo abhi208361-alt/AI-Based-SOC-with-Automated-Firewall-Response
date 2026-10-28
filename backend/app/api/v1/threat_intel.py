@@ -9,15 +9,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import settings
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.core.rbac import require_permission
-from backend.app.db.session import get_db
-from backend.app.models.ioc import IOC
-from backend.app.models.ioc import IOCType
-from backend.app.models.threat_intel import ThreatIntelSource
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.config import settings
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.rbac import require_permission
+from app.db.session import get_db
+from app.models.ioc import IOC
+from app.models.ioc import IOCType
+from app.models.threat_intel import ThreatIntelSource
+from app.models.user import User
+from app.schemas.common import (
     BaseSchema,
     IOCBulkCreate,
     IOCCreate,
@@ -28,8 +28,8 @@ from backend.app.schemas.common import (
     ThreatIntelEnrichmentRequest,
     ThreatIntelEnrichmentResponse,
 )
-from backend.app.services.threat_intel_service import ThreatIntelService
-from backend.app.services.firewall_service import FirewallService
+from app.services.threat_intel_service import ThreatIntelService
+from app.services.firewall_service import FirewallService
 
 router = APIRouter(prefix="/threat-intel", tags=["Threat Intelligence"])
 
@@ -422,3 +422,4 @@ def check_auto_block_criteria(
         "meets_criteria": should_block,
         "reason": "; ".join(reasons) if not should_block else "Meets all criteria",
     }
+

@@ -9,7 +9,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
-from backend.app.core.config import get_settings
+from app.core.config import get_settings
 
 settings = get_settings()
 
@@ -80,3 +80,4 @@ def drop_db() -> None:
 def close_db() -> None:
     """Dispose the database engine (used on application shutdown)."""
     engine.dispose()
+

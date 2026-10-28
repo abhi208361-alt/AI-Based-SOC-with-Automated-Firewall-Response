@@ -185,3 +185,4 @@ class DBService:
         saved = col.find_one({"_id": res.inserted_id})
         normalized = DBService._normalize_doc(saved)
         return normalized or {}
+

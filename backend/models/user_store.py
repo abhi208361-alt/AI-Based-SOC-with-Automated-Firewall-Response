@@ -1,4 +1,4 @@
-from core.security import hash_password
+from backend.core.security import hash_password
 
 # Demo in-memory user store for Step 1
 # Step 2+ can move this to MongoDB users collection.
@@ -18,3 +18,4 @@ USERS_DB: dict[str, dict] = {
         "disabled": False,
     },
 }
+

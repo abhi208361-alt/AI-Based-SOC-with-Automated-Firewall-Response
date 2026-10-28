@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class AlertStatus(str, enum.Enum):
@@ -153,3 +153,4 @@ class AlertNote(Base):
     
     def __repr__(self) -> str:
         return f"<AlertNote(id={self.id}, alert_id={self.alert_id})>"
+

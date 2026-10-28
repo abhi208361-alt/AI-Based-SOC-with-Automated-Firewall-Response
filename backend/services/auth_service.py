@@ -1,5 +1,5 @@
-from core.security import create_access_token, verify_password
-from database.mongodb import get_db
+from backend.core.security import create_access_token, verify_password
+from backend.database.mongodb import get_db
 from fastapi import HTTPException
 
 
@@ -25,3 +25,4 @@ class AuthService:
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user
+

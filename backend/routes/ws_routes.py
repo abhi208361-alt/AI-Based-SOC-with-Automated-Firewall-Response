@@ -21,3 +21,4 @@ async def websocket_attacks(websocket: WebSocket):
         await ws_manager.disconnect(websocket)
     except Exception:
         await ws_manager.disconnect(websocket)
+

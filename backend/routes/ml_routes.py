@@ -1,9 +1,14 @@
-from core.security import require_role
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from services.ml_service import MLService
 
-router = APIRouter(prefix="/ml", tags=["ML"])
+from backend.core.security import require_role
+from backend.services.ml_service import MLService
+
+
+router = APIRouter(
+    prefix="/ml",
+    tags=["ML"],
+)
 
 
 class MLPredictRequest(BaseModel):
@@ -18,6 +23,11 @@ class MLPredictRequest(BaseModel):
     severity_num: int = Field(..., ge=1, le=4)
 
 
-@router.post("/predict", dependencies=[Depends(require_role(["admin", "analyst"]))])
+@router.post(
+    "/predict",
+    dependencies=[
+        Depends(require_role(["admin", "analyst"]))
+    ],
+)
 def predict(payload: MLPredictRequest):
     return MLService.predict(payload.model_dump())

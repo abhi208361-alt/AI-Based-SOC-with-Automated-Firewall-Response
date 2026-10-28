@@ -31,7 +31,7 @@ if user:
     print(f"\n3. Password Verification: {'PASS' if verify_result else 'FAIL'}")
 
 # 4. Test LoginRequest model
-from backend.models.schemas import LoginRequest
+from models.schemas import LoginRequest
 login_req = LoginRequest(email='admin@soc.local', password='Admin@123')
 print(f"\n4. LoginRequest email: {login_req.email}")
 print(f"   LoginRequest password: {'*'*len(login_req.password) if login_req.password else 'EMPTY'}")
@@ -42,3 +42,4 @@ print(f"\n5. DATABASE_USER_SOURCE: MONGODB")
 print("\n" + "=" * 60)
 print("ALL CORE TESTS PASSED - MongoDB connection fix is working")
 print("=" * 60)
+

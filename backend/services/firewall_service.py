@@ -1,7 +1,7 @@
 import subprocess
 
 from models.schemas import FirewallActionRequest
-from services.db_service import DBService
+from backend.services.db_service import DBService
 
 
 class FirewallService:
@@ -66,3 +66,4 @@ class FirewallService:
             }
         except Exception as ex:
             return {"success": False, "message": str(ex), "command": cmd}
+

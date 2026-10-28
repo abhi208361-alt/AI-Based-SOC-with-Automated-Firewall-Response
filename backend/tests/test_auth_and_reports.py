@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
+from app.main import app
 
 
 def test_auth_login_success():
@@ -57,3 +57,4 @@ def test_reports_generate_success_with_token():
         body = res.json()
         assert body["report_name"].endswith(".pdf")
         assert body["report_path"].startswith("reports/")
+

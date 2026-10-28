@@ -10,12 +10,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.core.rbac import require_permission
-from backend.app.db.session import get_db
-from backend.app.models.alert import Alert, AlertSeverity, AlertStatus
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.rbac import require_permission
+from app.db.session import get_db
+from app.models.alert import Alert, AlertSeverity, AlertStatus
+from app.models.user import User
+from app.schemas.common import (
     AlertCreate,
     AlertResponse,
     AlertUpdate,
@@ -24,7 +24,7 @@ from backend.app.schemas.common import (
     MessageResponse,
     PaginatedResponse,
 )
-from backend.app.services.alert_service import AlertService
+from app.services.alert_service import AlertService
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -227,3 +227,4 @@ def delete_alert(
     alert_service.delete_alert(alert_id)
 
     return MessageResponse(message="Alert deleted successfully")
+

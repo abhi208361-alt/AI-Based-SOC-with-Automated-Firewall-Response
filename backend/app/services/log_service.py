@@ -11,9 +11,9 @@ from uuid import UUID
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.models.log import LogEntry, LogSource, LogLevel, LogSourceType
-from backend.app.schemas.common import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.models.log import LogEntry, LogSource, LogLevel, LogSourceType
+from app.schemas.common import (
     LogEntryCreate,
     LogSearchRequest,
 )
@@ -231,3 +231,4 @@ class LogService:
             "parsed": {"raw": sample_log},
             "success": True,
         }
+

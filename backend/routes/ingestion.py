@@ -1,6 +1,6 @@
-from core.security import require_role
+from backend.core.security import require_role
 from fastapi import APIRouter, Body, Depends
-from services.log_ingestion_service import LogIngestionService
+from backend.services.log_ingestion_service import LogIngestionService
 
 router = APIRouter(prefix="/ingestion", tags=["Log Ingestion"])
 
@@ -8,3 +8,4 @@ router = APIRouter(prefix="/ingestion", tags=["Log Ingestion"])
 @router.post("/file", dependencies=[Depends(require_role(["admin", "analyst"]))])
 def ingest_from_file(file_path: str = Body(..., embed=True)):
     return LogIngestionService.ingest_file(file_path)
+

@@ -24,14 +24,9 @@ import {
 } from "../services/api";
 import { connectAttackSocket } from "../services/socket";
 
-import DoSSimulationPanel from "../components/soc/DoSSimulationPanel";
-import LiveAttackMapPanel from "../components/soc/LiveAttackMapPanel";
 import ThreatActivityPanel from "../components/soc/ThreatActivityPanel";
 import AttackTypesPanel from "../components/soc/AttackTypesPanel";
-import SystemHealthPanel from "../components/soc/SystemHealthPanel";
 import RecentSecurityActivity from "../components/soc/RecentSecurityActivity";
-import ThreatIntelligenceSources from "../components/soc/ThreatIntelligenceSources";
-import GlobalThreatIntelligence from "../components/soc/GlobalThreatIntelligence";
 
 function normalizeAttackList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -137,6 +132,43 @@ function getSourceIp(attack) {
   );
 }
 
+function getAttackStatus(attack) {
+  const raw = String(
+    attack?.status ||
+      attack?.state ||
+      attack?.action_taken ||
+      attack?.action ||
+      "active"
+  ).toLowerCase();
+
+  if (raw.includes("resolved") || raw.includes("closed")) {
+    return "resolved";
+  }
+
+  if (raw.includes("blocked") || raw.includes("contained")) {
+    return "blocked";
+  }
+
+  return "active";
+}
+
+function formatLastSeen(timestamp) {
+  if (!timestamp) return "Unknown";
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function KpiCard({
   title,
   value,
@@ -225,21 +257,14 @@ export default function DashboardPage({
 
     try {
       const response = await getAttacksApi(500);
-      const rows = normalizeAttackList(
-        response?.data ?? response
-      );
+      const rows = normalizeAttackList(response?.data ?? response);
 
       if (mountedRef.current) {
-        setAttacks((current) =>
-          mergeAttacks(rows, current)
-        );
+        setAttacks((current) => mergeAttacks(rows, current));
         setError("");
       }
     } catch (requestError) {
-      console.error(
-        "Dashboard attack loading error:",
-        requestError
-      );
+      console.error("Dashboard attack loading error:", requestError);
 
       if (mountedRef.current) {
         setError("Unable to load live attack data.");
@@ -266,10 +291,7 @@ export default function DashboardPage({
         setApiHealthy(true);
       }
     } catch (systemHealthError) {
-      console.warn(
-        "Structured system health unavailable:",
-        systemHealthError
-      );
+      console.warn("Structured system health unavailable:", systemHealthError);
 
       try {
         await healthApi();
@@ -293,15 +315,8 @@ export default function DashboardPage({
     loadAttacks();
     loadHealth();
 
-    const attackTimer = window.setInterval(
-      loadAttacks,
-      5000
-    );
-
-    const healthTimer = window.setInterval(
-      loadHealth,
-      30000
-    );
+    const attackTimer = window.setInterval(loadAttacks, 5000);
+    const healthTimer = window.setInterval(loadHealth, 30000);
 
     return () => {
       mountedRef.current = false;
@@ -312,24 +327,12 @@ export default function DashboardPage({
 
   useEffect(() => {
     const disconnect = connectAttackSocket({
-      onOpen: () => {
-        setWsConnected(true);
-      },
-
-      onClose: () => {
-        setWsConnected(false);
-      },
-
-      onError: () => {
-        setWsConnected(false);
-      },
-
+      onOpen: () => setWsConnected(true),
+      onClose: () => setWsConnected(false),
+      onError: () => setWsConnected(false),
       onMessage: (message) => {
         if (message?.event === "system_health") {
-          const health =
-            message.data ||
-            message.payload ||
-            null;
+          const health = message.data || message.payload || null;
 
           if (health) {
             setLiveHealth(health);
@@ -387,14 +390,9 @@ export default function DashboardPage({
           ""
       ).toLowerCase();
 
-      const status = String(
-        attack?.status || ""
-      ).toLowerCase();
+      const status = String(attack?.status || "").toLowerCase();
 
-      if (
-        action.includes("block") ||
-        status.includes("block")
-      ) {
+      if (action.includes("block") || status.includes("block")) {
         uniqueIps.add(getSourceIp(attack));
       }
     });
@@ -406,16 +404,11 @@ export default function DashboardPage({
 
   const activeThreats = useMemo(() => {
     return attacks.filter((attack) => {
-      const status = String(
-        attack?.status || "active"
-      ).toLowerCase();
+      const status = String(attack?.status || "active").toLowerCase();
 
-      return ![
-        "resolved",
-        "closed",
-        "blocked",
-        "contained",
-      ].some((value) => status.includes(value));
+      return !["resolved", "closed", "blocked", "contained"].some((value) =>
+        status.includes(value)
+      );
     }).length;
   }, [attacks]);
 
@@ -440,8 +433,7 @@ export default function DashboardPage({
     if (!attacks.length) return 0;
 
     const total = attacks.reduce(
-      (sum, attack) =>
-        sum + Number(attack?.risk_score || 0),
+      (sum, attack) => sum + Number(attack?.risk_score || 0),
       0
     );
 
@@ -452,9 +444,7 @@ export default function DashboardPage({
     return attacks.filter((attack) => {
       return (
         attack?.threat_intel_match === true ||
-        String(
-          attack?.threat_intel_match
-        ).toLowerCase() === "true" ||
+        String(attack?.threat_intel_match).toLowerCase() === "true" ||
         Number(attack?.risk_score || 0) >= 85
       );
     }).length;
@@ -474,44 +464,81 @@ export default function DashboardPage({
     });
 
     return [...counts.entries()]
-      .map(([name, value]) => ({
-        name,
-        value,
-      }))
+      .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
   }, [attacks]);
 
   const threatDistribution = useMemo(
     () => [
-      {
-        name: "Critical",
-        value: criticalAlerts,
-        color: "#ef4444",
-      },
-      {
-        name: "High",
-        value: highAlerts,
-        color: "#f97316",
-      },
-      {
-        name: "Medium",
-        value: mediumAlerts,
-        color: "#eab308",
-      },
-      {
-        name: "Low",
-        value: lowAlerts,
-        color: "#22c55e",
-      },
+      { name: "Critical", value: criticalAlerts, color: "#ef4444" },
+      { name: "High", value: highAlerts, color: "#f97316" },
+      { name: "Medium", value: mediumAlerts, color: "#eab308" },
+      { name: "Low", value: lowAlerts, color: "#22c55e" },
     ],
-    [
-      criticalAlerts,
-      highAlerts,
-      mediumAlerts,
-      lowAlerts,
-    ]
+    [criticalAlerts, highAlerts, mediumAlerts, lowAlerts]
   );
+
+  const activeMaliciousIps = useMemo(() => {
+    const map = new Map();
+
+    attacks.forEach((attack) => {
+      const ip = getSourceIp(attack);
+      const status = getAttackStatus(attack);
+
+      if (!ip || ip === "Unknown" || status === "resolved") {
+        return;
+      }
+
+      const existing = map.get(ip) || {
+        ip,
+        severity: "low",
+        risk: 0,
+        lastSeen: null,
+        country: attack?.country || attack?.location || "Unknown",
+        status,
+      };
+
+      const attackSeverity = getSeverity(attack);
+      const attackRisk = Number(attack?.risk_score || 0);
+      const timestamp =
+        attack?.timestamp ||
+        attack?.created_at ||
+        attack?.detected_at ||
+        attack?.event_time ||
+        null;
+
+      if (attackSeverity === "critical") {
+        existing.severity = "critical";
+      } else if (attackSeverity === "high" && existing.severity !== "critical") {
+        existing.severity = "high";
+      } else if (attackSeverity === "medium" && existing.severity === "low") {
+        existing.severity = "medium";
+      }
+
+      existing.risk = Math.max(existing.risk, attackRisk);
+      existing.lastSeen =
+        timestamp &&
+        (!existing.lastSeen ||
+          new Date(timestamp) > new Date(existing.lastSeen))
+          ? timestamp
+          : existing.lastSeen;
+
+      existing.country =
+        attack?.country ||
+        attack?.location ||
+        existing.country ||
+        "Unknown";
+
+      existing.status = status === "active" ? "active" : existing.status;
+
+      map.set(ip, existing);
+    });
+
+    return [...map.values()]
+      .sort((a, b) => b.risk - a.risk || a.ip.localeCompare(b.ip))
+      .slice(0, 12);
+  }, [attacks]);
 
   const kpis = [
     {
@@ -628,36 +655,103 @@ export default function DashboardPage({
 
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((kpi) => (
-            <KpiCard
-              key={kpi.title}
-              {...kpi}
-            />
+            <KpiCard key={kpi.title} {...kpi} />
           ))}
+        </section>
+
+        <section className="rounded-2xl border border-cyan-900/80 bg-[#071a2f]/90 p-4 shadow-[0_0_18px_rgba(0,149,255,0.08)]">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold text-white">
+              Active Malicious IPs
+            </h3>
+            <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-300">
+              {activeMaliciousIps.length} active
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-cyan-800/80 text-slate-400">
+                  <th className="px-3 py-2 font-medium">IP Address</th>
+                  <th className="px-3 py-2 font-medium">Country</th>
+                  <th className="px-3 py-2 font-medium">Severity</th>
+                  <th className="px-3 py-2 font-medium">Risk Score</th>
+                  <th className="px-3 py-2 font-medium">Last Seen</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {activeMaliciousIps.length ? (
+                  activeMaliciousIps.map((item) => (
+                    <tr
+                      key={item.ip}
+                      className="border-b border-cyan-900/70 text-slate-200 last:border-0 hover:bg-cyan-900/20"
+                    >
+                      <td className="px-3 py-3 font-mono text-cyan-300">
+                        {item.ip}
+                      </td>
+
+                      <td className="px-3 py-3 text-slate-300">
+                        {item.country || item.location || "Unknown"}
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <span
+                          className={`rounded-full border px-2 py-1 text-[10px] font-semibold capitalize ${
+                            item.severity === "critical"
+                              ? "border-red-500/30 bg-red-500/10 text-red-300"
+                              : item.severity === "high"
+                                ? "border-orange-500/30 bg-orange-500/10 text-orange-300"
+                                : item.severity === "medium"
+                                  ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300"
+                                  : "border-green-500/30 bg-green-500/10 text-green-300"
+                          }`}
+                        >
+                          {item.severity}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-3 text-slate-200">
+                        {item.risk}
+                      </td>
+
+                      <td className="px-3 py-3 text-slate-400">
+                        {formatLastSeen(item.lastSeen)}
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <span
+                          className={`rounded-full border px-2 py-1 text-[10px] font-medium capitalize ${
+                            item.status === "active"
+                              ? "border-red-500/30 bg-red-500/10 text-red-300"
+                              : "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-3 py-8 text-center text-sm text-slate-400"
+                    >
+                      No active malicious IPs detected.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="space-y-4 xl:col-span-8">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <DoSSimulationPanel />
-
-              <LiveAttackMapPanel
-                attacks={attacks}
-              />
-            </div>
-
-            <RecentSecurityActivity
-              attacks={attacks.slice(0, 20)}
-            />
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <ThreatIntelligenceSources
-                attacks={attacks}
-              />
-
-              <GlobalThreatIntelligence
-                attacks={attacks}
-              />
-            </div>
+            <RecentSecurityActivity attacks={attacks.slice(0, 20)} />
           </div>
 
           <aside className="space-y-4 xl:col-span-4">
@@ -666,16 +760,7 @@ export default function DashboardPage({
               total={attacks.length}
             />
 
-            <AttackTypesPanel
-              data={attackTypesData}
-            />
-
-            <SystemHealthPanel
-              attacks={attacks}
-              apiHealthy={apiHealthy}
-              wsConnected={wsConnected}
-              health={liveHealth}
-            />
+            <AttackTypesPanel data={attackTypesData} />
           </aside>
         </section>
 

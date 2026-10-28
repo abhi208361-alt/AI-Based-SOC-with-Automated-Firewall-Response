@@ -31,3 +31,4 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             )
 
         return response
+

@@ -1,7 +1,7 @@
 import os
 
-from core.security import hash_password
-from database.mongodb import db
+from backend.core.security import hash_password
+from backend.database.mongodb import db
 
 
 def seed_admin_if_enabled() -> None:
@@ -34,3 +34,4 @@ def seed_admin_if_enabled() -> None:
         },
         upsert=True,
     )
+

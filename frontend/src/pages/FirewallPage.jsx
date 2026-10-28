@@ -195,13 +195,17 @@ export default function FirewallPage({
       const blockedFromEvents = rows
         .filter((attack) => {
           const action = getAction(attack).toLowerCase();
-          const status = String(
-            attack?.status || ""
-          ).toLowerCase();
+          const status = String(attack?.status || "").toLowerCase();
+          const severity = getSeverity(attack);
 
           return (
             action.includes("block") ||
-            status.includes("block")
+            status.includes("block") ||
+            severity === "high" ||
+            severity === "critical" ||
+            String(attack?.attack_type || "")
+              .toLowerCase()
+              .includes("suspicious")
           );
         })
         .map(getIp)
@@ -232,24 +236,17 @@ export default function FirewallPage({
       onError: () => setWsConnected(false),
       onMessage: (event) => {
         if (event?.event === "new_attack") {
-          const attack =
-            event.data ||
-            event.attack ||
-            event.item;
+          const attack = event.data || event.attack || event.item;
 
           if (attack) {
-            setAttacks((current) =>
-              mergeAttacks([attack], current)
-            );
+            setAttacks((current) => mergeAttacks([attack], current));
           }
 
           return;
         }
 
         if (event?.event === "firewall_action") {
-          const action =
-            event.data ||
-            event.payload;
+          const action = event.data || event.payload;
 
           if (!action?.ip_address) {
             return;
@@ -271,21 +268,15 @@ export default function FirewallPage({
               ]),
             ]);
 
-            setMessage(
-              `Firewall update: ${action.ip_address} blocked.`
-            );
+            setMessage(`Firewall update: ${action.ip_address} blocked.`);
           }
 
           if (action.action === "unblock") {
             setBlockedIps((current) =>
-              current.filter(
-                (ip) => ip !== action.ip_address
-              )
+              current.filter((ip) => ip !== action.ip_address)
             );
 
-            setMessage(
-              `Firewall update: ${action.ip_address} unblocked.`
-            );
+            setMessage(`Firewall update: ${action.ip_address} unblocked.`);
           }
         }
       },
@@ -325,9 +316,7 @@ export default function FirewallPage({
       );
 
       if (active) {
-        setLocations(
-          Object.fromEntries(values.filter(Boolean))
-        );
+        setLocations(Object.fromEntries(values.filter(Boolean)));
       }
     }
 
@@ -347,6 +336,19 @@ export default function FirewallPage({
   const highCount = attacks.filter(
     (attack) => getSeverity(attack) === "high"
   ).length;
+
+  const suspiciousCount = attacks.filter((attack) => {
+    const type = String(attack?.attack_type || "").toLowerCase();
+    const reason = String(attack?.reason || "").toLowerCase();
+    const severity = getSeverity(attack);
+
+    return (
+      type.includes("suspicious") ||
+      reason.includes("suspicious") ||
+      severity === "high" ||
+      severity === "critical"
+    );
+  }).length;
 
   async function selectIp(ip) {
     setSelectedIp(ip);
@@ -384,9 +386,7 @@ export default function FirewallPage({
         ]),
       ]);
 
-      setMessage(
-        `${selectedIp} was submitted for blocking.`
-      );
+      setMessage(`${selectedIp} was submitted for blocking.`);
     } catch (requestError) {
       setError(
         requestError?.response?.data?.detail ||
@@ -414,9 +414,7 @@ export default function FirewallPage({
         current.filter((value) => value !== ip)
       );
 
-      setMessage(
-        `${ip} was submitted for unblocking.`
-      );
+      setMessage(`${ip} was submitted for unblocking.`);
     } catch (requestError) {
       setError(
         requestError?.response?.data?.detail ||
@@ -489,10 +487,10 @@ export default function FirewallPage({
 
           <div className="rounded-xl border border-cyan-900/70 bg-[#071426] p-4">
             <p className="text-xs uppercase text-slate-500">
-              High Threats
+              High / Suspicious
             </p>
             <p className="mt-2 text-3xl font-bold text-orange-300">
-              {highCount}
+              {highCount + suspiciousCount}
             </p>
           </div>
 
@@ -530,56 +528,135 @@ export default function FirewallPage({
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Panel
-              title="Attacker Geolocation"
+              title="Global Threat Intelligence Map"
               icon={<MapPin size={16} />}
             >
-              <div className="relative min-h-[420px] overflow-hidden rounded-lg border border-cyan-900 bg-[#031326]">
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] bg-[size:32px_32px]" />
+              <div className="relative overflow-hidden rounded-xl border border-fuchsia-500/30 bg-[#02040b]">
+                <div
+                  className="relative h-[420px] w-full bg-cover bg-center bg-no-repeat"
+                  style={{ backgroundImage: "url('/world-map.png')" }}
+                >
+                  {/* Dark overlay keeps the map consistent with the SOC theme. */}
+                  <div className="absolute inset-0 bg-[#020617]/20" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-[#020617]/10 via-transparent to-[#020617]/70" />
 
-                <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-                  <div className="h-4 w-4 animate-pulse rounded-full bg-cyan-300 shadow-[0_0_20px_#22d3ee]" />
-                  <span className="mt-1 text-[10px] text-cyan-300">
-                    SOC
-                  </span>
-                </div>
-
-                {Object.entries(locations).map(([ip, location]) => (
-                  <div
-                    key={ip}
-                    className="absolute"
-                    style={{
-                      left: `${((location.longitude + 180) / 360) * 100}%`,
-                      top: `${((90 - location.latitude) / 180) * 100}%`,
-                    }}
+                  {/* Decorative neon network connections. */}
+                  <svg
+                    className="absolute inset-0 h-full w-full"
+                    viewBox="0 0 1000 500"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
                   >
-                    <div className="h-3 w-3 animate-pulse rounded-full bg-red-400 shadow-[0_0_16px_#ef4444]" />
+                    {[
+                      [180, 180, 490, 160],
+                      [490, 160, 710, 260],
+                      [490, 160, 570, 350],
+                      [180, 180, 310, 350],
+                      [710, 260, 820, 390],
+                      [570, 350, 820, 390],
+                    ].map(([x1, y1, x2, y2], index) => (
+                      <path
+                        key={`route-${index}`}
+                        d={`M ${x1} ${y1} Q ${(x1 + x2) / 2} ${Math.min(y1, y2) - 100} ${x2} ${y2}`}
+                        fill="none"
+                        stroke="#ff35e8"
+                        strokeWidth="1.2"
+                        strokeOpacity="0.7"
+                        strokeDasharray="5 7"
+                      >
+                        <animate
+                          attributeName="stroke-dashoffset"
+                          from="0"
+                          to="-48"
+                          dur={`${2 + index * 0.3}s`}
+                          repeatCount="indefinite"
+                        />
+                      </path>
+                    ))}
 
-                    <span className="absolute left-4 top-0 whitespace-nowrap rounded bg-black/70 px-1 text-[9px] text-red-200">
-                      {ip}
+                    {[
+                      [180, 180],
+                      [490, 160],
+                      [710, 260],
+                      [310, 350],
+                      [570, 350],
+                      [820, 390],
+                    ].map(([x, y], index) => (
+                      <g key={`hub-${index}`}>
+                        <circle cx={x} cy={y} r="12" fill="#ec4899" fillOpacity="0.15" />
+                        <rect
+                          x={x - 5}
+                          y={y - 5}
+                          width="10"
+                          height="10"
+                          rx="1"
+                          fill="#ffffff"
+                          stroke="#ff35e8"
+                          strokeWidth="2"
+                        />
+                      </g>
+                    ))}
+                  </svg>
+
+                  {/* Real attacker markers from the backend geolocation API. */}
+                  {Object.entries(locations).map(([ip, location]) => (
+                    <div
+                      key={ip}
+                      className="absolute z-10"
+                      style={{
+                        left: `${((location.longitude + 180) / 360) * 100}%`,
+                        top: `${((90 - location.latitude) / 180) * 100}%`,
+                      }}
+                      title={`${ip} — ${location.label || "Unknown location"}`}
+                    >
+                      <span className="absolute -inset-2 animate-ping rounded-full bg-red-500/30" />
+                      <span className="relative block h-3 w-3 rounded-full border-2 border-white bg-red-500 shadow-[0_0_18px_5px_rgba(239,68,68,0.8)]" />
+                      <span className="absolute left-4 top-0 whitespace-nowrap rounded border border-red-500/30 bg-[#020617]/95 px-2 py-1 font-mono text-[10px] text-red-300">
+                        {ip}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Map status overlays. */}
+                  <div className="absolute bottom-3 left-3 rounded-lg border border-fuchsia-500/30 bg-[#020617]/90 px-3 py-2">
+                    <p className="text-xs font-bold tracking-widest text-fuchsia-300">GLOBAL SOC</p>
+                    <p className="mt-1 text-[10px] text-slate-400">
+                      {Object.keys(locations).length} GEOLOCATED ATTACKERS
+                    </p>
+                  </div>
+
+                  <div className="absolute right-3 top-3 flex items-center gap-2 rounded-full border border-fuchsia-500/30 bg-[#020617]/90 px-3 py-2">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-fuchsia-400" />
+                    <span className="text-[10px] font-semibold tracking-wider text-fuchsia-300">
+                      {wsConnected ? "LIVE MONITORING" : "POLLING MODE"}
                     </span>
                   </div>
-                ))}
 
-                {!Object.keys(locations).length && (
-                  <div className="absolute inset-0 grid place-items-center">
-                    <div className="rounded-lg border border-slate-700 bg-[#020b1c]/90 p-4 text-center">
-                      <p className="text-sm text-slate-300">
-                        {loading
-                          ? "Loading attacker locations..."
-                          : "No geolocation data available"}
-                      </p>
+                  {!Object.keys(locations).length && (
+                    <div className="absolute inset-0 z-[1] grid place-items-center">
+                      <div className="rounded-lg border border-slate-700 bg-[#020b1c]/85 p-4 text-center backdrop-blur-sm">
+                        <p className="text-sm text-slate-300">
+                          {loading ? "Loading attacker locations..." : "No geolocation data available"}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Attacker markers appear when the backend returns coordinates.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
-              <div className="mt-3 flex justify-between text-xs text-slate-500">
-                <span>
-                  Geolocated attackers:{" "}
-                  {Object.keys(locations).length}
-                </span>
-
-                <span>Backend location service</span>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  Detected attackers
+                </div>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <span className="h-2 w-2 rounded-full bg-fuchsia-400" />
+                  Decorative network hubs
+                </div>
+                <span className="text-slate-500">Geolocation powered by backend</span>
               </div>
             </Panel>
 
@@ -593,9 +670,7 @@ export default function FirewallPage({
 
                   <select
                     value={selectedIp}
-                    onChange={(event) =>
-                      selectIp(event.target.value)
-                    }
+                    onChange={(event) => selectIp(event.target.value)}
                     className="mt-1 w-full rounded-lg border border-cyan-900 bg-[#041326] px-3 py-3 text-sm"
                   >
                     <option value="">
@@ -662,9 +737,7 @@ export default function FirewallPage({
                               : "text-green-300"
                           }
                         >
-                          {selectedIntel.malicious
-                            ? "Yes"
-                            : "No"}
+                          {selectedIntel.malicious ? "Yes" : "No"}
                         </span>
                       </p>
                     </div>
@@ -673,10 +746,7 @@ export default function FirewallPage({
 
                 <div className="rounded-lg border border-cyan-900 bg-[#041326] p-4">
                   <div className="flex items-center gap-2">
-                    <CheckCircle
-                      size={17}
-                      className="text-green-300"
-                    />
+                    <CheckCircle size={17} className="text-green-300" />
 
                     <span className="text-sm font-semibold">
                       Windows Defender Firewall

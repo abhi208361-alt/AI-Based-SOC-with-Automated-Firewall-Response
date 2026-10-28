@@ -19,7 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.dialects.postgresql import UUID
-from backend.app.models.ioc import IOCType, IOCSource, IOCStatus
+from app.models.ioc import IOCType, IOCSource, IOCStatus
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -259,3 +259,4 @@ class Campaign(Base):
     
     def __repr__(self) -> str:
         return f"<Campaign(id={self.id}, name={self.name}, active={self.is_active})>"
+

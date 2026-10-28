@@ -2,7 +2,7 @@ import sys
 sys.path.insert(0, r'C:\Users\abhishek\Downloads\ai-based soc\backend')
 from backend.services.db_service import DBService
 from backend.core.security import verify_password
-from backend.models.schemas import LoginRequest
+from models.schemas import LoginRequest
 
 # Simulate the exact login flow
 
@@ -37,3 +37,4 @@ if user:
     print(f"User disabled check: {disabled}")
 else:
     print("User NOT found - this could be the issue!")
+

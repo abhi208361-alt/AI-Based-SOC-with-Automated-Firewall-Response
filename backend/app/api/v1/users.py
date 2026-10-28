@@ -8,12 +8,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import get_settings
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.core.rbac import require_admin, require_permission
-from backend.app.db.session import get_db
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.config import get_settings
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.rbac import require_admin, require_permission
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.common import (
     MessageResponse,
     PaginatedResponse,
     RoleCreate,
@@ -23,7 +23,7 @@ from backend.app.schemas.common import (
     UserResponse,
     UserUpdate,
 )
-from backend.app.services.auth_service import AuthService
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -344,3 +344,4 @@ def remove_permission(
     role = auth_service.remove_permission(role_id, permission_name)
     
     return RoleResponse.model_validate(role)
+

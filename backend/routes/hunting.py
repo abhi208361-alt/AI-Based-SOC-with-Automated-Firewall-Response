@@ -1,7 +1,7 @@
-from core.security import require_role
+from backend.core.security import require_role
 from fastapi import APIRouter, Depends
 from models.schemas import ThreatHuntRequest, ThreatHuntResponse
-from services.db_service import DBService
+from backend.services.db_service import DBService
 
 router = APIRouter(prefix="/hunting", tags=["Threat Hunting"])
 
@@ -23,3 +23,4 @@ def search_hunts(payload: ThreatHuntRequest):
 
     results = DBService.search_attacks(filters)
     return {"total": len(results), "results": results}
+

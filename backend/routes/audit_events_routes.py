@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends
-from backend.models.schemas import AuditEventCreate
+from models.schemas import AuditEventCreate
 from backend.services.db_service import DBService
 from typing import Any, List
 
@@ -32,3 +32,4 @@ def list_audit_events(limit: int = 100) -> List[dict]:
     # In a full implementation, this would query an audit log collection
     # For now, return empty list as audit events are generated internally
     return []
+

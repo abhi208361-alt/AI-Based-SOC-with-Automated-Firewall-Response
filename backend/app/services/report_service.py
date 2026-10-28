@@ -13,8 +13,8 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.models.report import Report, ReportSchedule, ReportStatus, ReportType
+from app.core.exceptions import NotFoundError, ValidationError
+from app.models.report import Report, ReportSchedule, ReportStatus, ReportType
 
 
 def _generate_report_id():
@@ -241,3 +241,4 @@ class ReportService:
             raise NotFoundError("Schedule not found: " + str(schedule_id))
         self.db.delete(schedule)
         self.db.commit()
+

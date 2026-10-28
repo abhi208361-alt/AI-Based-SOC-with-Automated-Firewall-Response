@@ -31,3 +31,4 @@ with open(main_py_path, 'w', encoding='utf-8') as f:
     f.writelines(new_lines)
 
 print('Done fixing main.py')
+

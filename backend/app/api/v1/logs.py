@@ -9,12 +9,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.core.rbac import require_permission
-from backend.app.db.session import get_db
-from backend.app.models.log import LogEntry, LogLevel, LogSourceType
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.rbac import require_permission
+from app.db.session import get_db
+from app.models.log import LogEntry, LogLevel, LogSourceType
+from app.models.user import User
+from app.schemas.common import (
     LogEntryCreate,
     LogEntryResponse,
     LogSearchRequest,
@@ -22,7 +22,7 @@ from backend.app.schemas.common import (
     MessageResponse,
     PaginatedResponse,
 )
-from backend.app.services.log_service import LogService
+from app.services.log_service import LogService
 
 router = APIRouter(prefix="/logs", tags=["Logs"])
 
@@ -302,3 +302,4 @@ def test_parser(
     """
     log_service = LogService(None)  # No DB needed for parser test
     return log_service.test_parser(parser_name, sample_log)
+

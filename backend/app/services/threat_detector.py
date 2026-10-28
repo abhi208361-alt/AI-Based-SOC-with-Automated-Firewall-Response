@@ -172,3 +172,4 @@ class ThreatDetector:
             mitre_techniques=mitre,
             recommended_action=action,
         )
+

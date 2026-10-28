@@ -37,3 +37,4 @@ class IncidentStore:
 
     def is_blocked(self, ip: str) -> bool:
         return ip in self._blocked_ips
+

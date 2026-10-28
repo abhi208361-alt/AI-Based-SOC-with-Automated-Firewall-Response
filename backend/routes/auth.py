@@ -1,9 +1,9 @@
 from typing import Any
 
-from core.security import create_access_token, get_current_user, verify_password
+from backend.core.security import create_access_token, get_current_user, verify_password
 from fastapi import APIRouter, Depends, HTTPException, status
 from models.schemas import LoginRequest, TokenResponse, UserProfile
-from services.db_service import DBService
+from backend.services.db_service import DBService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -41,3 +41,4 @@ def me(current_user: dict[str, Any] = Depends(get_current_user)):
         "full_name": str(current_user.get("full_name", "")),
         "role": str(current_user["role"]),
     }
+

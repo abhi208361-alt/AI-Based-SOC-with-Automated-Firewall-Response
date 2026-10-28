@@ -9,18 +9,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.core.rbac import require_permission
-from backend.app.db.session import get_db
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.rbac import require_permission
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.common import (
     SystemConfigCreate,
     SystemConfigResponse,
     SystemConfigUpdate,
     MessageResponse,
     PaginatedResponse,
 )
-from backend.app.services.admin_service import AdminService
+from app.services.admin_service import AdminService
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 
@@ -381,3 +381,4 @@ def delete_feature_flag(
     admin_service.delete_feature_flag(flag_key)
     
     return MessageResponse(message="Feature flag deleted successfully")
+

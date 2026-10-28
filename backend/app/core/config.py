@@ -71,3 +71,4 @@ def get_settings() -> Settings:
     settings = Settings()
     settings.validate_for_runtime()
     return settings
+

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from backend.models.schemas import Incident
+from models.schemas import Incident
 
 
 class IncidentService:
@@ -170,3 +170,4 @@ class IncidentService:
             "summary": summary or "Incident resolved",
             "message": f"Incident {incident_id} closed successfully",
         }
+

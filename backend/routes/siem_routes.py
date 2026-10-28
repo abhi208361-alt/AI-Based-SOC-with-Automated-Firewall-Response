@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from core.security import require_role
+from backend.core.security import require_role
 from fastapi import APIRouter, Depends
-from services.db_service import DBService
+from backend.services.db_service import DBService
 
 router = APIRouter(prefix="/siem", tags=["SIEM"])
 
@@ -47,3 +47,4 @@ def export_siem(limit: int = 500):
         "format": "ecs-like-json",
         "data": ecs_docs,
     }
+

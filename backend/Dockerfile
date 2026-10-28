@@ -1,14 +1,11 @@
 FROM python:3.11-slim
 
-WORKDIR /workspace
+WORKDIR /app
 
-COPY requirements.txt /tmp/requirements.txt
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-
-COPY . /workspace/backend
-
-ENV PYTHONPATH=/workspace
+COPY . /app
 
 EXPOSE 8000
 

@@ -23,10 +23,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.db.base import Base
-from backend.app.models.user import User
-from backend.app.schemas.common import SystemConfigCreate, SystemConfigUpdate
+from app.core.exceptions import NotFoundError, ValidationError
+from app.db.base import Base
+from app.models.user import User
+from app.schemas.common import SystemConfigCreate, SystemConfigUpdate
 
 
 class SystemConfig(Base):
@@ -233,3 +233,4 @@ class AdminService:
             raise NotFoundError("Feature flag not found: " + flag_key)
         self.db.delete(row)
         self.db.commit()
+

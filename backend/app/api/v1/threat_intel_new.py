@@ -9,13 +9,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.core.rbac import require_permission
-from backend.app.db.session import get_db
-from backend.app.models.ioc import IOC, IOCType
-from backend.app.models.threat_intel import ThreatIntelSource
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.rbac import require_permission
+from app.db.session import get_db
+from app.models.ioc import IOC, IOCType
+from app.models.threat_intel import ThreatIntelSource
+from app.models.user import User
+from app.schemas.common import (
     IOCBulkCreate,
     IOCCreate,
     IOCResponse,
@@ -25,7 +25,7 @@ from backend.app.schemas.common import (
     ThreatIntelEnrichmentRequest,
     ThreatIntelEnrichmentResponse,
 )
-from backend.app.services.threat_intel_service import ThreatIntelService
+from app.services.threat_intel_service import ThreatIntelService
 
 router = APIRouter(prefix="/threat-intel", tags=["Threat Intelligence"])
 
@@ -313,3 +313,4 @@ def delete_feed(
     ti_service.delete_feed(feed_id)
     
     return MessageResponse(message="Feed deleted successfully")
+

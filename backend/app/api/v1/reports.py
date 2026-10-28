@@ -9,12 +9,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.core.rbac import require_permission
-from backend.app.db.session import get_db
-from backend.app.models.report import Report, ReportType, ReportFormat, ReportStatus
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.rbac import require_permission
+from app.db.session import get_db
+from app.models.report import Report, ReportType, ReportFormat, ReportStatus
+from app.models.user import User
+from app.schemas.common import (
     ReportCreate,
     ReportResponse,
     ReportUpdate,
@@ -22,7 +22,7 @@ from backend.app.schemas.common import (
     MessageResponse,
     PaginatedResponse,
 )
-from backend.app.services.report_service import ReportService
+from app.services.report_service import ReportService
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -300,3 +300,4 @@ def delete_schedule(
     report_service.delete_schedule(schedule_id)
     
     return MessageResponse(message="Scheduled report deleted successfully")
+

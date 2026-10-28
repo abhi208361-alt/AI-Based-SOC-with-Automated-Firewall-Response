@@ -12,3 +12,7 @@ ml_models/
 .env
 .env.*
 !.env.example
+data/cic_ids_2017/
+*.zip
+ml_models/*.pkl
+ml_models/model_metadata.json

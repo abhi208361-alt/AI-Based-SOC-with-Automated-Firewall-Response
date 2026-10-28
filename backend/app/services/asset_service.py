@@ -11,15 +11,15 @@ from uuid import UUID
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.models.asset import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.models.asset import (
     Asset,
     AssetCriticality,
     AssetStatus,
     AssetType,
     AssetVulnerability,
 )
-from backend.app.schemas.common import (
+from app.schemas.common import (
     AssetCreate,
     AssetUpdate,
 )
@@ -209,3 +209,4 @@ class AssetService:
     def get_discovery_job(self, job_id: int) -> dict:
         """Get status of a discovery job."""
         return {"job_id": job_id, "status": "unknown"}
+

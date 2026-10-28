@@ -9,10 +9,10 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import settings
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.models.ioc import IOC, IOCType, IOCStatus
-from backend.app.services.firewall_service import FirewallService
+from app.core.config import settings
+from app.core.exceptions import NotFoundError, ValidationError
+from app.models.ioc import IOC, IOCType, IOCStatus
+from app.services.firewall_service import FirewallService
 from uuid import uuid4
 
 
@@ -94,7 +94,7 @@ def get_stats(self) -> dict:
             }
 
         # Trigger firewall block through FirewallService
-        from backend.app.schemas.firewall import FirewallActionRequest
+        from app.schemas.firewall import FirewallActionRequest
 
         request = FirewallActionRequest(
             ip_address=ioc.value,
@@ -134,3 +134,4 @@ def get_stats(self) -> dict:
 
         return True
         return self.db.query(IOC).filter(IOC.id == ioc_id).first()
+

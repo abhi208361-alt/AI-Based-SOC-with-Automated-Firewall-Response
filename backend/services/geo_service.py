@@ -37,3 +37,4 @@ class GeoService:
                 "lon": None,
                 "isp": None,
             }
+

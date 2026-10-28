@@ -1,6 +1,6 @@
-from core.security import require_role
+from backend.core.security import require_role
 from fastapi import APIRouter, Depends
-from services.db_service import DBService
+from backend.services.db_service import DBService
 
 router = APIRouter(prefix="/db", tags=["DB Admin"])
 
@@ -13,3 +13,4 @@ def list_firewall_rules():
         "total": len(DBService.list_firewall_rules()),
         "results": DBService.list_firewall_rules(),
     }
+

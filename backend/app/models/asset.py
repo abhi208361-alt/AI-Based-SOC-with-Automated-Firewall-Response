@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID, INET, CIDR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class AssetType(str, enum.Enum):
@@ -268,3 +268,4 @@ class AssetSoftware(Base):
     
     def __repr__(self) -> str:
         return f"<AssetSoftware(id={self.id}, asset_id={self.asset_id}, name={self.name}, version={self.version})>"
+

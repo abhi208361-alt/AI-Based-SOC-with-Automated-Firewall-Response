@@ -12,3 +12,4 @@ if user:
     print("hashed_password value:", pw2[:50] if pw2 else "EMPTY")
 else:
     print("User NOT found")
+

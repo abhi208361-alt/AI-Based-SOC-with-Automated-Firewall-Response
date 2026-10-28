@@ -4,12 +4,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
-import ThreatsPage from "./pages/ThreatsPage";
-import SystemHealthPage from "./pages/SystemHealthPage";
 import AttackLogsPage from "./pages/AttackLogsPage";
 import FirewallPage from "./pages/FirewallPage";
 import ReportsPage from "./pages/ReportsPage";
-import AssistantPage from "./pages/AssistantPage";
 import SettingsPage from "./pages/SettingsPage";
 import AttackDetailsPage from "./pages/AttackDetailsPage";
 
@@ -80,16 +77,6 @@ export default function App() {
       />
 
       <Route
-        path="/threats"
-        element={<ThreatsPage profile={profile} onLogout={logout} />}
-      />
-
-      <Route
-        path="/system-health"
-        element={<SystemHealthPage profile={profile} onLogout={logout} />}
-      />
-
-      <Route
         path="/logs"
         element={<AttackLogsPage profile={profile} onLogout={logout} />}
       />
@@ -102,11 +89,6 @@ export default function App() {
       <Route
         path="/reports"
         element={<ReportsPage profile={profile} onLogout={logout} />}
-      />
-
-      <Route
-        path="/assistant"
-        element={<AssistantPage profile={profile} onLogout={logout} />}
       />
 
       <Route

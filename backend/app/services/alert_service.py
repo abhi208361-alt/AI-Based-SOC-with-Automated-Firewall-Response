@@ -10,11 +10,11 @@ from uuid import UUID
 from sqlalchemy import desc, func, or_, and_
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.db.base import get_db_session
-from backend.app.models.alert import Alert, AlertSeverity, AlertStatus, AlertSource
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.db.base import get_db_session
+from app.models.alert import Alert, AlertSeverity, AlertStatus, AlertSource
+from app.models.user import User
+from app.schemas.common import (
     AlertCreate,
     AlertUpdate,
     AlertResponse,
@@ -224,3 +224,4 @@ class AlertService:
         self.db.commit()
         self.db.refresh(alert)
         return alert
+

@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class NotificationChannel(str, enum.Enum):
@@ -264,3 +264,4 @@ class NotificationPreference(Base):
     
     def __repr__(self) -> str:
         return f"<NotificationPreference(user_id={self.user_id})>"
+

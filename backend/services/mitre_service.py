@@ -11,3 +11,4 @@ class MitreService:
     @staticmethod
     def map_attack(attack_type: str) -> dict:
         return MITRE_MAP.get(attack_type, {"tactic": "Unknown", "technique": "Unknown"})
+

@@ -21,3 +21,4 @@ if user:
     print(f"  email: {user.get('email', 'NOT FOUND')}")
     print(f"  role: {user.get('role', 'NOT FOUND')}")
     print(f"  disabled: {user.get('disabled', 'NOT FOUND')}")
+

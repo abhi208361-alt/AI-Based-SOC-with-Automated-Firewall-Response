@@ -11,18 +11,18 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
-from backend.app.core.auth import (
+from app.core.auth import (
     create_access_token,
     create_refresh_token,
     get_current_user,
     verify_password,
 )
-from backend.app.core.config import get_settings
-from backend.app.core.exceptions import AuthenticationError, ValidationError
-from backend.app.core.rbac import require_admin
-from backend.app.db.session import get_db
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.core.config import get_settings
+from app.core.exceptions import AuthenticationError, ValidationError
+from app.core.rbac import require_admin
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.common import (
     LoginRequest,
     MessageResponse,
     MFASetupResponse,
@@ -35,7 +35,7 @@ from backend.app.schemas.common import (
     UserCreate,
     UserResponse,
 )
-from backend.app.services.auth_service import AuthService
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -369,3 +369,4 @@ def register(
     )
     
     return UserResponse.model_validate(user)
+

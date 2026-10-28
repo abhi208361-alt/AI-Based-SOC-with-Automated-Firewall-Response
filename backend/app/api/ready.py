@@ -7,3 +7,4 @@ router = APIRouter(tags=["health"])
 def ready():
     # Add DB/Redis ping checks here in next PR.
     return {"status": "ready", "checks": {"database": "unknown", "redis": "unknown"}}
+

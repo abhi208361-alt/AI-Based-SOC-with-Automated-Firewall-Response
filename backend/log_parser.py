@@ -22,3 +22,4 @@ def parse_log_line(line: str) -> AttackLogIn:
         raw_message=data.get("raw_message", ""),
     )
     return payload
+

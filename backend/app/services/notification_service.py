@@ -11,15 +11,15 @@ from uuid import UUID
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.models.notification import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.models.notification import (
     Notification,
     NotificationChannel,
     NotificationPreference,
     NotificationPriority,
     NotificationStatus,
 )
-from backend.app.schemas.common import (
+from app.schemas.common import (
     NotificationCreate,
     NotificationPreferences,
     NotificationUpdate,
@@ -266,3 +266,4 @@ class NotificationService:
             "reachable": True,
             "config": {k: v for k, v in config.items() if "key" not in k.lower()},
         }
+

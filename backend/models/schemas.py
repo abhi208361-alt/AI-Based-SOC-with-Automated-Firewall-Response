@@ -102,3 +102,4 @@ class MLPredictResponse(BaseModel):
     anomaly_detected: bool
     anomaly_score: float
     risk_score: int
+

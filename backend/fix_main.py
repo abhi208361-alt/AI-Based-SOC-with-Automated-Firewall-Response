@@ -21,3 +21,4 @@ with open('C:/Users/abhishek/Downloads/ai-based soc/backend/app/main.py', 'w') a
     f.write(content)
 
 print('Done - replaced DOCS_ENABLED with settings.DOCS_ENABLED')
+

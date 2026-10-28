@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from backend.models.schemas import IncidentCreate, IncidentResponse
+from models.schemas import IncidentCreate, IncidentResponse
 from backend.services.db_service import DBService
 from typing import List, Any
 
@@ -48,3 +48,4 @@ def create_incident(payload: IncidentCreate) -> IncidentResponse:
         assigned_to=payload.assigned_to or "",
         created_at=attack.get("timestamp", "").isoformat() if hasattr(attack.get("timestamp"), 'isoformat') else str(attack.get("timestamp", "")),
     )
+

@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class LogSourceType(str, enum.Enum):
@@ -214,3 +214,4 @@ class LogEntry(Base):
     
     def __repr__(self) -> str:
         return f"<LogEntry(id={self.id}, source_id={self.source_id}, timestamp={self.timestamp})>"
+

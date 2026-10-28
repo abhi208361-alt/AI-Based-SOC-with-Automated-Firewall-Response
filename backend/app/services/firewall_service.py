@@ -17,9 +17,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
-from backend.app.db.session import get_db_session
-from backend.app.models.firewall import (
+from app.core.exceptions import NotFoundError, ValidationError
+from app.db.session import get_db_session
+from app.models.firewall import (
     FirewallAction,
     FirewallAuditLog,
     FirewallProvider,
@@ -27,8 +27,8 @@ from backend.app.models.firewall import (
     FirewallRule,
     FirewallRuleStatus,
 )
-from backend.app.models.user import User
-from backend.app.schemas.common import (
+from app.models.user import User
+from app.schemas.common import (
     FirewallActionRequest,
     FirewallActionResponse,
     FirewallRuleCreate,
@@ -1271,3 +1271,4 @@ class FirewallService:
         logs = query.order_by(desc(FirewallAuditLog.created_at)).offset((page - 1) * page_size).limit(page_size).all()
 
         return logs, total
+

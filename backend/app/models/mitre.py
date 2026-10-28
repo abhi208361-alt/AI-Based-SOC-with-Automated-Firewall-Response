@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from app.db.base import Base
 
 
 class MITREPlatform(str, enum.Enum):
@@ -337,3 +337,4 @@ class MITREMapping(Base):
     
     def __repr__(self) -> str:
         return f"<MITREMapping(detection_id={self.detection_id}, technique_id={self.technique_id}, confidence={self.confidence})>"
+
