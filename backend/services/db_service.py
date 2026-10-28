@@ -30,13 +30,16 @@ class DBService:
     def _normalize_doc(doc: dict[str, Any] | None) -> dict[str, Any] | None:
         if not doc:
             return doc
+
         out = dict(doc)
         if "_id" in out:
             out["id"] = str(out["_id"])
             del out["_id"]
+
         for k, v in list(out.items()):
             if isinstance(v, datetime):
                 out[k] = v.isoformat()
+
         return out
 
     @staticmethod
@@ -71,6 +74,7 @@ class DBService:
     @staticmethod
     def get_user_by_email(email: str) -> dict[str, Any] | None:
         email = (email or "").lower().strip()
+
         try:
             doc = DBService.get_user_collection().find_one({"email": email})
             return DBService._normalize_doc(doc)
@@ -87,6 +91,7 @@ class DBService:
         try:
             col = DBService.get_user_collection()
             doc: dict[str, Any] | None = None
+
             try:
                 doc = col.find_one({"_id": ObjectId(user_id)})
             except (InvalidId, TypeError, ValueError):
@@ -100,6 +105,46 @@ class DBService:
             for u in _FAKE_USERS.values():
                 if str(u.get("id")) == user_id:
                     return DBService._normalize_doc(u)
+            return None
+
+    @staticmethod
+    def update_user_by_id(user_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+        user_id = str(user_id).strip()
+        if not user_id:
+            return None
+
+        if not updates:
+            return DBService.get_user_by_id(user_id)
+
+        payload = dict(updates)
+        payload["updated_at"] = datetime.now(timezone.utc)
+
+        if "email" in payload:
+            payload["email"] = str(payload["email"]).lower().strip()
+
+        try:
+            col = DBService.get_user_collection()
+
+            try:
+                updated = col.find_one_and_update(
+                    {"_id": ObjectId(user_id)},
+                    {"$set": payload},
+                    return_document=True,
+                )
+            except (InvalidId, TypeError, ValueError):
+                updated = col.find_one_and_update(
+                    {"id": user_id},
+                    {"$set": payload},
+                    return_document=True,
+                )
+
+            return DBService._normalize_doc(updated)
+        except RuntimeError:
+            for key, user in list(_FAKE_USERS.items()):
+                if str(user.get("id")) == user_id:
+                    user.update(payload)
+                    _FAKE_USERS[key] = user
+                    return DBService._normalize_doc(user)
             return None
 
     @staticmethod
@@ -122,7 +167,12 @@ class DBService:
                 upsert=True,
             )
         except RuntimeError:
-            _FAKE_USERS.setdefault(email, safe_doc)
+            existing = _FAKE_USERS.get(email)
+            if existing:
+                existing.update(safe_doc)
+                _FAKE_USERS[email] = existing
+            else:
+                _FAKE_USERS[email] = safe_doc
 
     @staticmethod
     def insert_attack(item: dict[str, Any]) -> dict[str, Any]:
@@ -132,6 +182,7 @@ class DBService:
         item.setdefault("timestamp", now)
         item.setdefault("created_at", now)
         item.setdefault("updated_at", now)
+
         res = col.insert_one(item)
         saved = col.find_one({"_id": res.inserted_id})
         normalized = DBService._normalize_doc(saved)
@@ -159,6 +210,7 @@ class DBService:
         rule = dict(rule)
         rule.setdefault("created_at", now)
         rule.setdefault("updated_at", now)
+
         res = col.insert_one(rule)
         saved = col.find_one({"_id": res.inserted_id})
         normalized = DBService._normalize_doc(saved)
@@ -181,8 +233,8 @@ class DBService:
         incident = dict(incident)
         incident.setdefault("created_at", now)
         incident.setdefault("updated_at", now)
+
         res = col.insert_one(incident)
         saved = col.find_one({"_id": res.inserted_id})
         normalized = DBService._normalize_doc(saved)
         return normalized or {}
-

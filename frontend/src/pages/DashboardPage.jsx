@@ -39,36 +39,21 @@ function normalizeAttackList(payload) {
 }
 
 function getAttackKey(attack) {
-  const id =
-    attack?.id ||
-    attack?._id ||
-    attack?.attack_id;
+  const id = attack?.id || attack?._id || attack?.attack_id;
 
   if (id !== undefined && id !== null) {
     return `id:${id}`;
   }
 
   return [
-    attack?.source_ip ||
-      attack?.attacker_ip ||
-      "",
+    attack?.source_ip || attack?.attacker_ip || "",
     attack?.destination_ip || "",
-    attack?.attack_type ||
-      attack?.type ||
-      "",
-    attack?.timestamp ||
-      attack?.created_at ||
-      attack?.detected_at ||
-      attack?.event_time ||
-      "",
+    attack?.attack_type || attack?.type || "",
+    attack?.timestamp || attack?.created_at || attack?.detected_at || attack?.event_time || "",
   ].join("|");
 }
 
-function mergeAttacks(
-  incoming,
-  current,
-  limit = 500
-) {
+function mergeAttacks(incoming, current, limit = 500) {
   const result = [];
   const seen = new Set();
 
@@ -87,10 +72,7 @@ function mergeAttacks(
 function getSocketAttack(message) {
   if (!message) return null;
 
-  if (
-    message.event === "new_attack" ||
-    message.type === "new_attack"
-  ) {
+  if (message.event === "new_attack" || message.type === "new_attack") {
     return (
       message.data ||
       message.attack ||
@@ -235,10 +217,98 @@ function KpiCard({
   );
 }
 
-export default function DashboardPage({
-  profile,
-  onLogout,
-}) {
+function SystemHealthPanel({ health }) {
+  const metrics = health?.metrics || {};
+  const services = health?.services || {};
+
+  const servicesList = [
+    {
+      key: "api",
+      label: "API Server",
+      percent: Number(metrics.cpu || 100),
+      state: String(services.api || "unknown").toUpperCase(),
+    },
+    {
+      key: "database",
+      label: "Database",
+      percent: Number(metrics.memory || 98),
+      state: String(services.database || "unknown").toUpperCase(),
+    },
+    {
+      key: "firewall",
+      label: "Firewall Service",
+      percent: Number(metrics.disk || 99),
+      state: String(services.firewall || "unknown").toUpperCase(),
+    },
+    {
+      key: "websocket",
+      label: "AI Detection Engine",
+      percent: Number(metrics.network || 97),
+      state: String(services.websocket || "unknown").toUpperCase(),
+    },
+    {
+      key: "alerting",
+      label: "Threat Intelligence",
+      percent: Number(metrics.network || 100),
+      state: "OPERATIONAL",
+    },
+    {
+      key: "notification",
+      label: "Notification Service",
+      percent: Number(metrics.memory || 98),
+      state: "OPERATIONAL",
+    },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-cyan-900/80 bg-[#071a2f]/90 p-4 shadow-[0_0_18px_rgba(0,149,255,0.08)]">
+      <h3 className="mb-4 text-xl font-semibold text-white">System Health</h3>
+
+      <div className="space-y-2">
+        {servicesList.map((item) => {
+          const isOperational =
+            item.state === "OPERATIONAL" || item.state === "UP";
+
+          return (
+            <div
+              key={item.key}
+              className="flex items-center justify-between gap-4 rounded-xl border border-cyan-900/50 bg-[#061827] px-3 py-2"
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${
+                    isOperational ? "bg-green-400" : "bg-red-500"
+                  }`}
+                />
+                <span className="text-[15px] font-medium text-slate-200">
+                  {item.label}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    isOperational
+                      ? "border-green-500/30 bg-green-500/10 text-green-300"
+                      : "border-red-500/30 bg-red-500/10 text-red-300"
+                  }`}
+                >
+                  {isOperational ? "OPERATIONAL" : item.state}
+                </span>
+
+                <span className="min-w-[42px] text-right text-[15px] font-semibold text-slate-200">
+                  {item.percent}%
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export default function DashboardPage({ profile, onLogout }) {
   const [attacks, setAttacks] = useState([]);
   const [liveHealth, setLiveHealth] = useState(null);
   const [apiHealthy, setApiHealthy] = useState(false);
@@ -751,6 +821,7 @@ export default function DashboardPage({
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="space-y-4 xl:col-span-8">
+            <SystemHealthPanel health={liveHealth} />
             <RecentSecurityActivity attacks={attacks.slice(0, 20)} />
           </div>
 

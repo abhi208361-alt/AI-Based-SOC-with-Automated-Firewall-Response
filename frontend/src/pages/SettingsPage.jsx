@@ -17,15 +17,28 @@ function Panel({ title, children }) {
   );
 }
 
+function normalizeStoredProfile(profile) {
+  if (!profile) return null;
+
+  return {
+    id: profile.id || profile._id || "N/A",
+    email: profile.email || "",
+    full_name: profile.full_name || profile.name || "",
+    role: profile.role || "admin",
+  };
+}
+
 export default function SettingsPage({ profile, onLogout }) {
-  // Profile form state
+  const [currentProfile, setCurrentProfile] = useState(
+    normalizeStoredProfile(profile)
+  );
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
 
-  // Password form state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -36,15 +49,50 @@ export default function SettingsPage({ profile, onLogout }) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Initialize form with profile data
+  function persistProfile(updatedProfile) {
+    const safeProfile = normalizeStoredProfile(updatedProfile);
+    if (!safeProfile) return;
+
+    setCurrentProfile(safeProfile);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          ...safeProfile,
+          full_name: safeProfile.full_name,
+          email: safeProfile.email,
+          role: safeProfile.role,
+        })
+      );
+
+      localStorage.setItem(
+        "user_profile",
+        JSON.stringify({
+          ...safeProfile,
+          full_name: safeProfile.full_name,
+          email: safeProfile.email,
+          role: safeProfile.role,
+        })
+      );
+    }
+  }
+
   useEffect(() => {
-    if (profile) {
-      setFullName(profile?.full_name || "");
-      setEmail(profile?.email || "");
+    const storedUser =
+      typeof window !== "undefined"
+        ? JSON.parse(localStorage.getItem("user") || "null")
+        : null;
+
+    const incoming = normalizeStoredProfile(profile || storedUser);
+
+    if (incoming) {
+      setCurrentProfile(incoming);
+      setFullName(incoming.full_name || "");
+      setEmail(incoming.email || "");
     }
   }, [profile]);
 
-  // Clear messages after 5 seconds
   useEffect(() => {
     if (profileMessage) {
       const timer = setTimeout(() => setProfileMessage(""), 5000);
@@ -73,13 +121,11 @@ export default function SettingsPage({ profile, onLogout }) {
     }
   }, [passwordError]);
 
-  // Update profile
   async function updateProfile(event) {
     event.preventDefault();
     setProfileError("");
     setProfileMessage("");
 
-    // Validation
     if (!fullName.trim()) {
       setProfileError("Full name is required");
       return;
@@ -99,15 +145,32 @@ export default function SettingsPage({ profile, onLogout }) {
     setProfileLoading(true);
 
     try {
-      await updateProfileApi({
+      const response = await updateProfileApi({
         full_name: fullName.trim(),
         email: email.trim(),
       });
 
+      const updatedProfile = response?.data || {
+        id: currentProfile?.id || "N/A",
+        full_name: fullName.trim(),
+        email: email.trim(),
+        role: currentProfile?.role || "admin",
+      };
+
+      persistProfile(updatedProfile);
       setProfileMessage("✓ Profile updated successfully.");
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("profile-updated", {
+            detail: updatedProfile,
+          })
+        );
+      }
     } catch (err) {
       const errorMsg =
         err?.response?.data?.detail ||
+        err?.response?.data?.message ||
         err?.message ||
         "Failed to update profile";
       setProfileError(errorMsg);
@@ -116,13 +179,11 @@ export default function SettingsPage({ profile, onLogout }) {
     }
   }
 
-  // Update password
   async function updatePassword(event) {
     event.preventDefault();
     setPasswordError("");
     setPasswordMessage("");
 
-    // Validation
     if (!currentPassword) {
       setPasswordError("Current password is required");
       return;
@@ -165,6 +226,7 @@ export default function SettingsPage({ profile, onLogout }) {
     } catch (err) {
       const errorMsg =
         err?.response?.data?.detail ||
+        err?.response?.data?.message ||
         err?.message ||
         "Failed to change password";
       setPasswordError(errorMsg);
@@ -176,7 +238,7 @@ export default function SettingsPage({ profile, onLogout }) {
   return (
     <PageShell
       title="Settings"
-      profile={profile}
+      profile={currentProfile || profile}
       onLogout={onLogout}
     >
       <div className="mx-auto max-w-[1200px]">
@@ -190,10 +252,8 @@ export default function SettingsPage({ profile, onLogout }) {
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          {/* Profile Panel */}
           <Panel title="Profile Information">
             <form onSubmit={updateProfile} className="space-y-4">
-              {/* Full Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2">
                   Full Name
@@ -208,7 +268,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 />
               </div>
 
-              {/* Email */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2">
                   Email Address
@@ -223,7 +282,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 />
               </div>
 
-              {/* Profile Status Message */}
               {profileError && (
                 <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
                   <AlertCircle
@@ -244,7 +302,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 </div>
               )}
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={profileLoading}
@@ -255,10 +312,8 @@ export default function SettingsPage({ profile, onLogout }) {
             </form>
           </Panel>
 
-          {/* Password Panel */}
           <Panel title="Change Password">
             <form onSubmit={updatePassword} className="space-y-4">
-              {/* Current Password */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2">
                   Current Password
@@ -288,7 +343,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 </div>
               </div>
 
-              {/* New Password */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2">
                   New Password
@@ -317,7 +371,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 </div>
               </div>
 
-              {/* Confirm Password */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2">
                   Confirm Password
@@ -348,7 +401,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 </div>
               </div>
 
-              {/* Password Strength Indicator */}
               {newPassword && (
                 <div className="rounded-lg bg-[#041326] p-3">
                   <p className="text-xs font-semibold text-slate-400 mb-2">
@@ -396,7 +448,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 </div>
               )}
 
-              {/* Password Status Message */}
               {passwordError && (
                 <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
                   <AlertCircle
@@ -417,7 +468,6 @@ export default function SettingsPage({ profile, onLogout }) {
                 </div>
               )}
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={passwordLoading}
@@ -429,20 +479,19 @@ export default function SettingsPage({ profile, onLogout }) {
           </Panel>
         </div>
 
-        {/* Additional Info Panel */}
         <Panel title="Account Information">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <p className="text-xs text-slate-500">Account ID</p>
               <p className="mt-1 text-sm font-mono text-cyan-300">
-                {profile?.id || "N/A"}
+                {currentProfile?.id || profile?.id || "N/A"}
               </p>
             </div>
 
             <div>
               <p className="text-xs text-slate-500">Role</p>
               <p className="mt-1 text-sm font-semibold capitalize text-cyan-300">
-                {profile?.role || "N/A"}
+                {currentProfile?.role || profile?.role || "N/A"}
               </p>
             </div>
 

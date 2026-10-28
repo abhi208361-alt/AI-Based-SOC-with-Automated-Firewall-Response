@@ -71,7 +71,8 @@ if ENV == "prod" and len(SECRET_KEY) < 32:
 CORS_ORIGINS_RAW = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000,"
-    "http://localhost:5173,http://127.0.0.1:5173",
+    "http://localhost:5173,http://127.0.0.1:5173,"
+    "http://0.0.0.0:5173"
 )
 
 CORS_ORIGINS = [
@@ -121,7 +122,6 @@ def startup_event() -> None:
     try:
         connect_mongo()
     except Exception as exc:
-        # Development/test environments may use the DBService fallback.
         print(f"[WARNING] MongoDB connection failed: {exc}")
 
     try:
@@ -135,9 +135,7 @@ def startup_event() -> None:
                 "disabled": False,
             }
         )
-
         print("[INFO] Seed administrator verified: admin@soc.local")
-
     except Exception as exc:
         print(f"[WARNING] Seed administrator creation failed: {exc}")
 
