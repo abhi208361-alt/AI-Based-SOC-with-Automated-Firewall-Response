@@ -6,10 +6,10 @@ export default function PageShell({
   title = "AI SOC",
   profile,
   onLogout,
+  onSwitchUser,
   children,
 }) {
-  const [mobileSidebarOpen, setMobileSidebarOpen] =
-    useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   function closeSidebar() {
     setMobileSidebarOpen(false);
@@ -36,6 +36,7 @@ export default function PageShell({
           title={title}
           profile={profile}
           onLogout={onLogout}
+          onSwitchUser={onSwitchUser}
           onMenuClick={() => setMobileSidebarOpen(true)}
         />
 

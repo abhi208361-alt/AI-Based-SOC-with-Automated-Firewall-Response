@@ -1,32 +1,13 @@
 import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Bell,
   ChevronDown,
+  LogOut,
   Menu,
-  ShieldAlert,
+  ShieldCheck,
   UserCircle,
 } from "lucide-react";
-
-const accountOptions = [
-  {
-    id: "admin",
-    label: "SOC Admin",
-    email: "admin@soc.local",
-    role: "Administrator",
-  },
-  {
-    id: "analyst",
-    label: "SOC Analyst",
-    email: "analyst@soc.local",
-    role: "Analyst",
-  },
-  {
-    id: "manager",
-    label: "IR Manager",
-    email: "manager@soc.local",
-    role: "Incident Lead",
-  },
-];
 
 function getDisplayName(profile) {
   return (
@@ -34,32 +15,79 @@ function getDisplayName(profile) {
     profile?.name ||
     profile?.username ||
     profile?.email ||
-    "admin"
+    "SOC"
   );
 }
 
 function getRole(profile) {
-  return profile?.role || "Administrator";
+  return profile?.role || "admin";
 }
+
+const defaultNotifications = [
+  {
+    id: 1,
+    type: "critical",
+    title: "Critical threat detected",
+    detail: "Multiple failed logins and DDoS pattern detected from 203.0.113.15.",
+    time: "2 min ago",
+    unread: true,
+  },
+  {
+    id: 2,
+    type: "warning",
+    title: "Firewall action triggered",
+    detail: "Blocked suspicious IP 185.220.101.4 after malicious traffic spike.",
+    time: "8 min ago",
+    unread: true,
+  },
+  {
+    id: 3,
+    type: "info",
+    title: "System health check",
+    detail: "SOC platform remains fully operational and monitoring live traffic.",
+    time: "15 min ago",
+    unread: false,
+  },
+  {
+    id: 4,
+    type: "warning",
+    title: "Threat intelligence update",
+    detail: "New malicious indicators matched on outbound API traffic.",
+    time: "28 min ago",
+    unread: false,
+  },
+];
 
 export default function TopBar({
   title,
   profile,
   onLogout,
   onMenuClick,
+  onSwitchUser,
 }) {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showAccountMenu, setShowAccountMenu] = useState(false);
-  const [activeAccount, setActiveAccount] = useState(accountOptions[0]);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const notificationCount = useMemo(() => 3, []);
+  const notifications = useMemo(() => defaultNotifications, []);
 
-  const currentProfile = {
-    full_name: activeAccount.label,
-    email: activeAccount.email,
-    role: activeAccount.role,
-    ...profile,
-  };
+  const currentUserName = getDisplayName(profile);
+  const currentRole = getRole(profile);
+
+  const userOptions = [
+    { label: "SOC", role: "admin" },
+    { label: "Analyst", role: "analyst" },
+    { label: "Manager", role: "manager" },
+  ];
+
+  const activeNotifications = notifications.filter((n) => n.unread).length;
+
+  function handleSwitchUser(nextUser) {
+    setShowUserMenu(false);
+
+    if (onSwitchUser) {
+      onSwitchUser(nextUser);
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-cyan-900/70 bg-[#041326]/95 px-4 shadow-lg shadow-black/10 backdrop-blur-md md:px-6">
@@ -85,7 +113,7 @@ export default function TopBar({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-[10px] text-green-300 md:flex">
+        <div className="hidden items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-[10px] font-medium text-green-300 md:flex">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
           System Operational
         </div>
@@ -94,89 +122,62 @@ export default function TopBar({
           <button
             type="button"
             aria-label="Notifications"
-            aria-expanded={showNotifications}
-            aria-controls="notification-panel"
-            onClick={() => setShowNotifications((value) => !value)}
+            onClick={() => {
+              setShowNotifications((prev) => !prev);
+              setShowUserMenu(false);
+            }}
             className="relative rounded-lg p-2 text-slate-300 transition hover:bg-slate-800 hover:text-white"
           >
             <Bell size={18} />
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-              {notificationCount}
-            </span>
+            {activeNotifications > 0 && (
+              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                {activeNotifications}
+              </span>
+            )}
           </button>
 
           {showNotifications && (
-            <div
-              id="notification-panel"
-              className="absolute right-0 top-12 z-50 w-[320px] rounded-xl border border-cyan-800 bg-[#071a2f] shadow-2xl shadow-black/40"
-            >
-              <div className="flex items-center justify-between border-b border-cyan-900/70 px-3 py-2">
+            <div className="absolute right-0 top-12 w-[360px] rounded-xl border border-cyan-900/80 bg-[#071d32] shadow-2xl shadow-black/40">
+              <div className="flex items-center justify-between border-b border-cyan-900/60 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <ShieldAlert size={15} className="text-amber-300" />
-                  <span className="text-xs font-semibold text-white">
-                    Alerts
-                  </span>
+                  <Bell size={16} className="text-cyan-300" />
+                  <h3 className="text-sm font-semibold text-white">Notifications</h3>
                 </div>
-
-                <span className="text-[10px] text-slate-400">
-                  {notificationCount} new
+                <span className="rounded-full border border-cyan-700 bg-cyan-950/40 px-2 py-0.5 text-[10px] text-cyan-300">
+                  {notifications.length} new
                 </span>
               </div>
 
-              <div className="max-h-[260px] overflow-y-auto">
-                {[
-                  {
-                    id: 1,
-                    title: "Critical threat detected",
-                    time: "2 min ago",
-                    severity: "critical",
-                    message:
-                      "Multiple failed logins and DDoS pattern detected from 203.0.113.15.",
-                  },
-                  {
-                    id: 2,
-                    title: "Firewall action triggered",
-                    time: "8 min ago",
-                    severity: "warning",
-                    message:
-                      "Blocked suspicious IP 185.220.101.4 after malicious traffic spike.",
-                  },
-                  {
-                    id: 3,
-                    title: "System health check",
-                    time: "15 min ago",
-                    severity: "info",
-                    message:
-                      "SOC platform remains fully operational and monitoring live traffic.",
-                  },
-                ].map((item) => (
+              <div className="max-h-[330px] overflow-y-auto">
+                {notifications.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    className="flex w-full items-start gap-3 border-b border-cyan-900/60 px-3 py-3 text-left transition hover:bg-cyan-950/30"
+                    className="flex w-full items-start gap-3 border-b border-cyan-900/50 px-4 py-3 text-left transition hover:bg-cyan-900/20"
                   >
                     <span
                       className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                        item.severity === "critical"
-                          ? "bg-red-400"
-                          : item.severity === "warning"
-                            ? "bg-amber-400"
-                            : "bg-cyan-400"
+                        item.type === "critical"
+                          ? "bg-red-500"
+                          : item.type === "warning"
+                            ? "bg-yellow-400"
+                            : "bg-sky-400"
                       }`}
                     />
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-xs font-semibold text-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-white">
                           {item.title}
                         </p>
-                        <span className="text-[10px] text-slate-400">
+
+                        <span className="whitespace-nowrap text-[10px] text-slate-400">
                           {item.time}
                         </span>
                       </div>
 
-                      <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
-                        {item.message}
+                      <p className="mt-1 text-xs leading-5 text-slate-300">
+                        {item.detail}
                       </p>
                     </div>
                   </button>
@@ -186,85 +187,68 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="relative hidden sm:block">
+        <div className="relative">
           <button
             type="button"
-            aria-label="Switch account"
-            aria-expanded={showAccountMenu}
-            aria-controls="account-menu"
-            onClick={() => setShowAccountMenu((value) => !value)}
-            className="flex items-center gap-2 rounded-xl border border-cyan-800 bg-[#071a2f] px-2 py-1.5 text-left transition hover:border-cyan-600"
+            onClick={() => {
+              setShowUserMenu((prev) => !prev);
+              setShowNotifications(false);
+            }}
+            className="flex items-center gap-2 rounded-xl border border-cyan-900/80 bg-[#071a2f] px-2 py-1.5 hover:bg-cyan-950"
           >
-            <UserCircle size={20} className="text-cyan-300" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-300">
+              <UserCircle size={22} />
+            </div>
 
-            <div className="min-w-0">
-              <p className="truncate text-[10px] font-semibold text-white">
-                {currentProfile.full_name}
+            <div className="hidden text-left sm:block">
+              <p className="text-[11px] font-semibold text-white">
+                {currentUserName}
               </p>
-              <p className="truncate text-[9px] text-slate-400">
-                {currentProfile.role}
+              <p className="text-[9px] uppercase tracking-wide text-cyan-300">
+                {currentRole}
               </p>
             </div>
 
             <ChevronDown size={14} className="text-slate-400" />
           </button>
 
-          {showAccountMenu && (
-            <div
-              id="account-menu"
-              className="absolute right-0 top-12 z-50 w-[220px] rounded-xl border border-cyan-800 bg-[#071a2f] p-2 shadow-2xl shadow-black/40"
-            >
-              <div className="mb-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                Switch Account
-              </div>
+          {showUserMenu && (
+            <div className="absolute right-0 top-12 w-44 rounded-xl border border-cyan-900/80 bg-[#071d32] p-2 shadow-2xl shadow-black/40">
+              <p className="mb-2 px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Switch User
+              </p>
 
-              {accountOptions.map((account) => (
+              {userOptions.map((user) => (
                 <button
-                  key={account.id}
+                  key={user.role}
                   type="button"
-                  onClick={() => {
-                    setActiveAccount(account);
-                    setShowAccountMenu(false);
-                  }}
-                  className={`flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition ${
-                    activeAccount.id === account.id
-                      ? "bg-cyan-500/10 text-cyan-200"
-                      : "text-slate-300 hover:bg-slate-800"
+                  onClick={() => handleSwitchUser(user)}
+                  className={`flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm transition ${
+                    currentRole === user.role
+                      ? "bg-cyan-900/50 text-white"
+                      : "text-slate-200 hover:bg-cyan-900/20"
                   }`}
                 >
-                  <div>
-                    <div className="text-xs font-semibold">{account.label}</div>
-                    <div className="text-[10px] text-slate-400">
-                      {account.email}
-                    </div>
-                  </div>
-
-                  {activeAccount.id === account.id && (
-                    <span className="h-2 w-2 rounded-full bg-green-400" />
+                  <span>{user.label}</span>
+                  {currentRole === user.role && (
+                    <ShieldCheck size={14} className="text-green-300" />
                   )}
                 </button>
               ))}
 
-              <div className="mt-2 border-t border-cyan-900/60 pt-2">
+              <div className="mt-2 border-t border-cyan-900/50 pt-2">
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="w-full rounded-lg border border-red-500/30 px-3 py-2 text-[10px] text-red-300 transition hover:bg-red-500/10"
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm text-red-300 transition hover:bg-red-500/10"
                 >
-                  Logout
+                  <span>Logout</span>
+                  <LogOut size={14} />
                 </button>
               </div>
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={onLogout}
-          className="hidden rounded-lg border border-red-500/30 px-3 py-1.5 text-[10px] text-red-300 transition hover:bg-red-500/10 sm:block"
-        >
-          Logout
-        </button>
       </div>
     </header>
   );
